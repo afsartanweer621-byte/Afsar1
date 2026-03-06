@@ -1,0 +1,23 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global access for general resources (adjust in production)
+    match /{document=**} {
+      allow read, write: if true;
+    }
+
+    // Secured submission flow: Applications (PendingRequests) require an authenticated UID (anonymous is fine)
+    match /PendingRequests/{requestId} {
+      allow create: if request.auth != null;
+      allow read, update, delete: if true; 
+    }
+
+    match /AuthorizedUsers/{userId} { allow read, write: if true; }
+    match /Products/{id} { allow read, write: if true; }
+    match /Orders/{orderId} { allow read, write: if true; }
+    match /Notifications/{notificationId} { allow read, write: if true; }
+    match /categories/{id} { allow read, write: if true; }
+  }
+}

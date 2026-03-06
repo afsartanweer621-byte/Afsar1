@@ -1,0 +1,40 @@
+{
+  "placeholderImages": [
+    {
+      "id": "hero-footwear",
+      "description": "Mochibazaar Hero Image",
+      "imageUrl": "https://images.unsplash.com/photo-1770236859733-d09bb7db134e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxsdXh1cnklMjBmb290d2VhcnxlbnwwfHx8fDE3NzE2NzQxMjd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "luxury footwear"
+    },
+    {
+      "id": "sneakers",
+      "description": "Sneakers Category",
+      "imageUrl": "https://images.unsplash.com/photo-1709258228137-19a8c193be39?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxydW5uaW5nJTIwc25lYWtlcnN8ZW58MHx8fHwxNzcxNjc0MTI3fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "running sneakers"
+    },
+    {
+      "id": "formal",
+      "description": "Formal Category",
+      "imageUrl": "https://images.unsplash.com/photo-1615694758632-7f1928592cb1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8bGVhdGhlciUyMG94Zm9yZHN8ZW58MHx8fHwxNzcxNjc0MTI3fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "leather oxfords"
+    },
+    {
+      "id": "boots",
+      "description": "Boots Category",
+      "imageUrl": "https://images.unsplash.com/photo-1510424708915-8f4900f5cb00?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxydWdnZWQlMjBib290c3xlbnwwfHx8fDE3NzE2NzQxMjd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "rugged boots"
+    },
+    {
+      "id": "product-sneaker-1",
+      "description": "Elite Runner XT-2",
+      "imageUrl": "https://images.unsplash.com/photo-1608229751021-ed4bd8677753?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHx3aGl0ZSUyMHNuZWFrZXJzfGVufDB8fHx8MTc3MTY0NTg5MHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "white sneakers"
+    },
+    {
+      "id": "product-formal-1",
+      "description": "Milano Leather Brogue",
+      "imageUrl": "https://images.unsplash.com/photo-1618022325802-7e5e732d97a1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxibGFjayUyMGxlYXRoZXJ8ZW58MHx8fHwxNzcxNjc0MTI3fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "black leather"
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+
+{
+  "entities": {
+    "PendingRequest": {
+      "title": "PendingRequest",
+      "description": "Initial registration request from a potential retailer.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "firmName": { "type": "string" },
+        "gst": { "type": "string" },
+        "phone": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] },
+        "accessCode": { "type": "string" },
+        "openingBalance": { "type": "number", "description": "Starting credit/debit balance." },
+        "creditLimit": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["firmName", "gst", "phone", "status"]
+    },
+    "AuthorizedUser": {
+      "title": "AuthorizedUser",
+      "description": "Retailer profile with access credentials and financial balance.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "firmName": { "type": "string" },
+        "phone": { "type": "string" },
+        "gst": { "type": "string" },
+        "accessCode": { "type": "string" },
+        "openingBalance": { "type": "number", "description": "Static starting credit/debit balance." },
+        "accountBalance": { "type": "number", "description": "Real-time running balance updated by transactions." },
+        "creditLimit": { "type": "number" },
+        "authorizedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["phone", "accessCode"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "A payment record received from a retailer.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "paymentDate": { "type": "string", "format": "date-time" },
+        "remarks": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "paymentDate"]
+    },
+    "Product": {
+      "title": "Product",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "imageUrl": { "type": "string", "description": "URL of the product image." },
+        "price": { "type": "number" },
+        "mrp": { "type": "number" },
+        "stockQuantity": { "type": "number" },
+        "categoryId": { "type": "string" },
+        "hsn": { "type": "string", "default": "6403" },
+        "displayOrder": { "type": "number", "description": "Manual display sequence for the catalog." }
+      }
+    },
+    "CarouselSlide": {
+      "title": "CarouselSlide",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "ctaText": { "type": "string" },
+        "ctaLink": { "type": "string" },
+        "order": { "type": "number" }
+      }
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Wholesale order placed by a retailer.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string", "description": "UID of the retailer." },
+        "items": { "type": "array", "items": { "type": "object" } },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["Processing", "Approved", "Shipped", "Delivered", "Cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System broadcast message for retailers.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["Alert", "Update", "Promotion"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "message", "type"]
+    }
+  },
+  "auth": {
+    "providers": ["anonymous"]
+  },
+  "firestore": {
+    "/PendingRequests/{requestId}": {
+      "schema": "PendingRequest",
+      "description": "Public write-only collection for new registration requests."
+    },
+    "/AuthorizedUsers/{userId}": {
+      "schema": "AuthorizedUser",
+      "description": "Retailer profiles mapping UID to business data."
+    },
+    "/Payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Retailer payments audit trail."
+    },
+    "/AuthorizedUsers/{userId}/readNotifications/{notificationId}": {
+      "schema": { "type": "object", "properties": { "readAt": { "type": "string", "format": "date-time" } } },
+      "description": "Tracking which global notifications a specific user has read."
+    },
+    "/Products/{productId}": {
+      "schema": "Product",
+      "description": "Global product catalog."
+    },
+    "/Orders/{orderId}": {
+      "schema": "Order",
+      "description": "Private collection for user orders."
+    },
+    "/Notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "Global system broadcasts."
+    },
+    "/app_assets/homepage/carousel/{slideId}": {
+      "schema": "CarouselSlide",
+      "description": "Slides for the homepage hero carousel."
+    }
+  }
+}

@@ -1,0 +1,16 @@
+# Firebase App Hosting Configuration
+kind: "bundle"
+apiVersion: "v1"
+
+# Environment settings
+env:
+  - name: NODE_ENV
+    value: production
+
+# Build settings
+# Increasing resources ensures the Next.js 15 standalone tracing process succeeds.
+runConfig:
+  cpu: 2
+  memoryMiB: 4096
+  minInstances: 0
+  maxInstances: 10
