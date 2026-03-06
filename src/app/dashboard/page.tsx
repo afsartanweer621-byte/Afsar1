@@ -1,4 +1,3 @@
-
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PersonalizedRecommendations } from "@/components/recommendations/PersonalizedRecommendations";
@@ -13,6 +12,7 @@ import {
   CreditCard
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 
 export default function Dashboard() {
