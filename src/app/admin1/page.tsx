@@ -508,7 +508,7 @@ function Admin1Content() {
       </main>
 
       <Dialog open={isAddingRetailer} onOpenChange={setIsAddingRetailer}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md rounded-none bg-background p-6">
+        <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto rounded-none bg-background p-6">
           <DialogHeader className="mb-4"><DialogTitle className="text-2xl font-black uppercase">Manual Addition</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1">
@@ -539,7 +539,7 @@ function Admin1Content() {
       </Dialog>
 
       <Dialog open={!!editingRequest} onOpenChange={() => setEditingRequest(null)}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md rounded-none bg-background p-6">
+        <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto rounded-none bg-background p-6">
           <DialogHeader className="mb-4"><DialogTitle className="text-2xl font-black uppercase">Registry Edit</DialogTitle></DialogHeader>
           <div className="space-y-6">
             <div className="space-y-2">
@@ -558,7 +558,7 @@ function Admin1Content() {
       </Dialog>
 
       <Dialog open={!!editingPayment} onOpenChange={() => setEditingPayment(null)}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md rounded-none bg-background p-6">
+        <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto rounded-none bg-background p-6">
           <DialogHeader className="mb-4"><DialogTitle className="text-2xl font-black uppercase">Payment Entry</DialogTitle></DialogHeader>
           <div className="space-y-6">
             <select className="w-full h-12 border border-primary/10 bg-transparent px-3 text-[10px] font-black uppercase" value={editingPayment?.userId ?? ""} onChange={(e) => setEditingPayment({...editingPayment, userId: e.target.value})}>
