@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -193,6 +194,7 @@ function AdminContent() {
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [editingSlide, setEditingSlide] = useState<any>(null);
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
+  const [productToDelete, setProductToDelete] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [productSearch, setProductSearch] = useState("");
@@ -557,6 +559,14 @@ function AdminContent() {
     toast({ title: "Order Deleted", description: "The record has been purged from the registry." });
   };
 
+  const handleConfirmDeleteProduct = () => {
+    if (!productToDelete) return;
+    const productRef = doc(db, "Products", productToDelete);
+    deleteDocumentNonBlocking(productRef);
+    setProductToDelete(null);
+    toast({ title: "Article Deleted", description: "The article has been removed from the active registry." });
+  };
+
   const handleSaveProduct = () => {
     if (!editingProduct) return;
     if (!editingProduct.id) {
@@ -583,14 +593,6 @@ function AdminContent() {
     
     setEditingProduct(null);
     toast({ title: "Inventory Updated" });
-  };
-
-  const handleDeleteProduct = (productId: string) => {
-    if (confirm(`Delete article ${productId}?`)) {
-      const productRef = doc(db, "Products", productId);
-      deleteDocumentNonBlocking(productRef);
-      toast({ title: "Article Deleted" });
-    }
   };
 
   const handleMoveProduct = (product: any, direction: 'up' | 'down') => {
@@ -874,7 +876,7 @@ function AdminContent() {
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
                             <Button variant="ghost" size="sm" onClick={() => setEditingProduct(p)} className="p-1"><Edit className="h-3 w-3" /></Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteProduct(p.id)} className="h-8 w-8 text-destructive"><Trash2 className="h-3 w-3" /></Button>
+                            <Button variant="ghost" size="icon" onClick={() => setProductToDelete(p.id)} className="h-8 w-8 text-destructive"><Trash2 className="h-3 w-3" /></Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -984,6 +986,26 @@ function AdminContent() {
             <AlertDialogCancel className="rounded-none uppercase font-black text-[10px] tracking-widest h-12">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmDeleteOrder} className="rounded-none bg-destructive text-destructive-foreground hover:bg-destructive/90 uppercase font-black text-[10px] tracking-widest h-12">
               Delete Order
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
+        <AlertDialogContent className="rounded-none border-none">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-2 text-destructive mb-2">
+              <AlertTriangle className="h-5 w-5" />
+              <AlertDialogTitle className="uppercase font-black tracking-tighter text-xl">Confirm Deletion</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-[11px] font-medium uppercase tracking-widest leading-relaxed">
+              Are you sure? This will remove Article #{productToDelete} from the active registry.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-6">
+            <AlertDialogCancel className="rounded-none uppercase font-black text-[10px] tracking-widest h-12">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDeleteProduct} className="rounded-none bg-destructive text-destructive-foreground hover:bg-destructive/90 uppercase font-black text-[10px] tracking-widest h-12">
+              Delete Article
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
