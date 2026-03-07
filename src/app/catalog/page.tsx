@@ -242,7 +242,7 @@ export default function CatalogPage() {
                         onClick={(e) => handleAddToCart(product, e)}
                         className="flex-1 bg-primary text-background hover:bg-accent rounded-none font-black uppercase text-[9px] tracking-widest h-10 px-0"
                       >
-                        ADD <ShoppingCart className="ml-2 h-3 w-3" />
+                        ADD TO CART <ShoppingCart className="ml-2 h-3 w-3" />
                       </Button>
                     </div>
                   </div>

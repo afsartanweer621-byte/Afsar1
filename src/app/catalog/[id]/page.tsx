@@ -227,7 +227,7 @@ export default function ArticleDetailPage() {
                   onClick={handleAddToCart}
                   className="flex-1 w-full h-16 bg-primary text-background hover:bg-accent rounded-none font-black uppercase text-xs tracking-[0.4em] transition-all"
                 >
-                  Authorize Sourcing <ShoppingCart className="ml-4 h-5 w-5" />
+                  Add to Cart <ShoppingCart className="ml-4 h-5 w-5" />
                 </Button>
               </div>
               <p className="text-[8px] font-black uppercase tracking-[0.2em] text-accent text-center sm:text-left opacity-60">
