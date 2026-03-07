@@ -78,7 +78,6 @@ export default function CatalogPage() {
       }
     });
     
-    // Filter out items marked as deleted
     return merged
       .filter(p => !p.deleted)
       .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
@@ -111,7 +110,6 @@ export default function CatalogPage() {
       return;
     }
 
-    // ENFORCE MULTIPLE OF 4 PIECES
     if (qty % 4 !== 0) {
       toast({ 
         variant: "destructive", 
@@ -195,16 +193,6 @@ export default function CatalogPage() {
                       <Package className="h-4 w-4" />
                     </div>
                   )}
-                  <div className="absolute top-1 left-1 flex flex-col gap-1">
-                    <Badge className="bg-primary/90 text-[10px] font-black uppercase px-2 py-0.5 rounded-none border-none">
-                      AVL: {product.stockQuantity}
-                    </Badge>
-                    {product.margin && (
-                      <Badge className="bg-accent text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-none border-none">
-                        {product.margin}% MARGIN
-                      </Badge>
-                    )}
-                  </div>
                 </div>
                 
                 <div className="p-1.5 space-y-1">
@@ -212,10 +200,22 @@ export default function CatalogPage() {
                     {product.name}
                   </h3>
                   
-                  <div className="space-y-1 pt-1 border-t border-primary/5">
-                    <div className="flex justify-between items-end">
-                      <div className="text-[10px] md:text-[11px] font-black text-primary">₹{product.price?.toLocaleString('en-IN')}</div>
-                      <div className="text-[7px] font-bold text-primary/40 line-through">MRP: ₹{product.mrp}</div>
+                  <div className="space-y-1.5 pt-1.5 border-t border-primary/5">
+                    <div className="flex justify-between items-center">
+                      <div className="flex flex-col">
+                        <span className="text-[7px] uppercase font-black opacity-40 leading-none mb-0.5">Wholesale</span>
+                        <div className="text-[10px] md:text-[11px] font-black text-primary">₹{product.price?.toLocaleString('en-IN')}</div>
+                      </div>
+
+                      <div className="flex flex-col items-center">
+                        <span className="text-[8px] font-black text-accent">{product.margin}% <span className="text-[6px]">MGN</span></span>
+                        <span className="text-[7px] font-black opacity-30">AVL: {product.stockQuantity}</span>
+                      </div>
+
+                      <div className="flex flex-col items-end">
+                        <span className="text-[7px] uppercase font-black opacity-40 leading-none mb-0.5">MRP</span>
+                        <div className="text-[8px] font-bold text-primary/40 line-through">₹{product.mrp}</div>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-1">
