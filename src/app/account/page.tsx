@@ -1,27 +1,40 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { 
   User, 
   Download,
   Clock,
   FileText,
   FileSpreadsheet,
-  ArrowRight
+  ArrowRight,
+  CreditCard,
+  ShieldCheck,
+  Loader2
 } from "lucide-react";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { collection, query, where, doc } from "firebase/firestore";
+import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { cn } from "@/lib/utils";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 export default function AccountPage() {
   const { user } = useUser();
@@ -30,9 +43,16 @@ export default function AccountPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    // Load Razorpay Script
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    document.body.appendChild(script);
   }, []);
 
   const sessionProfileRef = useMemoFirebase(() => user ? doc(db, "AuthorizedUsers", user.uid) : null, [db, user]);
@@ -105,6 +125,71 @@ export default function AccountPage() {
   const currentOutstanding = totalDebits - totalCredits;
 
   const utilizationPercent = Math.min(100, (Math.max(0, currentOutstanding) / (profile?.creditLimit || 1)) * 100);
+
+  const handlePayNow = () => {
+    const amount = parseFloat(paymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({ variant: "destructive", title: "Invalid Amount", description: "Please enter a valid amount to pay." });
+      return;
+    }
+
+    if (!window.Razorpay) {
+      toast({ variant: "destructive", title: "System Error", description: "Payment gateway is not ready. Please refresh." });
+      return;
+    }
+
+    setIsProcessingPayment(true);
+
+    const options = {
+      key: "rzp_test_placeholder", // Replace with actual Razorpay Key
+      amount: amount * 100, // Razorpay works in paise
+      currency: "INR",
+      name: "MOCHIBAZAAR",
+      description: "Business Account Repayment",
+      image: "https://picsum.photos/seed/1/200/200",
+      handler: function (response: any) {
+        // Create Payment Record in Firestore on Success
+        const paymentId = crypto.randomUUID();
+        const paymentRef = doc(db, "Payments", paymentId);
+        
+        const paymentData = {
+          id: paymentId,
+          userId: masterId,
+          amount: amount,
+          paymentDate: new Date().toISOString(),
+          remarks: `Online Repayment (Ref: ${response.razorpay_payment_id})`,
+          createdAt: new Date().toISOString(),
+          razorpay_id: response.razorpay_payment_id
+        };
+
+        setDocumentNonBlocking(paymentRef, paymentData, { merge: true });
+        
+        toast({
+          title: "Payment Successful",
+          description: `₹${formatCurrency(amount)} has been credited to your ledger.`,
+        });
+        
+        setPaymentAmount("");
+        setIsProcessingPayment(false);
+        setActiveTab("ledger");
+      },
+      prefill: {
+        name: profile?.firmName || "Retailer",
+        contact: profile?.phone || "",
+      },
+      theme: {
+        color: "#000000",
+      },
+      modal: {
+        ondismiss: function() {
+          setIsProcessingPayment(false);
+        }
+      }
+    };
+
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+  };
 
   const handleDownloadInvoice = (order: any) => {
     if (!profile) return;
@@ -334,6 +419,7 @@ export default function AccountPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8 md:space-y-12">
           <TabsList className="bg-primary p-1 rounded-none h-14 w-full flex overflow-x-auto gap-1 no-scrollbar">
             <TabsTrigger value="overview" className="flex-1 md:flex-none rounded-none px-6 md:px-8 h-full data-[state=active]:bg-accent uppercase font-black text-[9px] md:text-[10px]">Overview</TabsTrigger>
+            <TabsTrigger value="paynow" className="flex-1 md:flex-none rounded-none px-6 md:px-8 h-full data-[state=active]:bg-accent uppercase font-black text-[9px] md:text-[10px]">Pay Now</TabsTrigger>
             <TabsTrigger value="ledger" className="flex-1 md:flex-none rounded-none px-6 md:px-8 h-full data-[state=active]:bg-accent uppercase font-black text-[9px] md:text-[10px]">Statement</TabsTrigger>
             <TabsTrigger value="orders" className="flex-1 md:flex-none rounded-none px-6 md:px-8 h-full data-[state=active]:bg-accent uppercase font-black text-[9px] md:text-[10px]">Orders</TabsTrigger>
           </TabsList>
@@ -363,6 +449,55 @@ export default function AccountPage() {
                 <div className="text-2xl md:text-3xl font-black text-green-600">₹{formatCurrency(totalCredits)}</div>
               </div>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="paynow">
+            <div className="max-w-xl mx-auto">
+              <Card className="rounded-none border-none shadow-2xl p-6 md:p-12 space-y-8">
+                <CardHeader className="p-0 text-center">
+                  <div className="bg-primary/5 p-8 rounded-full w-24 h-24 mx-auto flex items-center justify-center mb-6">
+                    <CreditCard className="h-10 w-10 text-accent" />
+                  </div>
+                  <CardTitle className="text-2xl font-black uppercase">Instant Settlement</CardTitle>
+                  <CardDescription className="text-[10px] uppercase font-black tracking-widest mt-2">Clear your outstanding balance via Razorpay</CardDescription>
+                </CardHeader>
+                
+                <div className="space-y-6">
+                  <div className="space-y-3">
+                    <Label className="text-[10px] font-black uppercase tracking-widest">Amount to Pay (INR)</Label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-4 font-black text-xl">₹</span>
+                      <Input 
+                        type="number"
+                        placeholder="Enter amount..."
+                        className="rounded-none h-16 pl-10 text-2xl font-black border-primary/10"
+                        value={paymentAmount}
+                        onChange={(e) => setPaymentAmount(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[9px] font-bold uppercase opacity-60">
+                      <span>Min Pay: ₹1.00</span>
+                      <button onClick={() => setPaymentAmount(Math.max(0, currentOutstanding).toString())} className="text-accent underline">Pay Full O/S</button>
+                    </div>
+                  </div>
+
+                  <Button 
+                    onClick={handlePayNow}
+                    disabled={isProcessingPayment || !paymentAmount}
+                    className="w-full h-20 bg-primary text-background hover:bg-accent rounded-none uppercase font-black text-[10px] tracking-[0.4em] transition-all"
+                  >
+                    {isProcessingPayment ? <Loader2 className="h-5 w-5 animate-spin" /> : "Initiate Payment"}
+                  </Button>
+
+                  <div className="bg-secondary/5 p-4 flex items-center gap-4 border-l-4 border-accent">
+                    <ShieldCheck className="h-6 w-6 text-accent" />
+                    <p className="text-[9px] font-black uppercase tracking-widest leading-relaxed opacity-60">
+                      Secure encrypted transaction powered by Razorpay. Your ledger will be updated instantly upon success.
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="ledger">
