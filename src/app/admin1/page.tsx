@@ -21,7 +21,7 @@ import {
 import { useFirestore, useCollection, useMemoFirebase, useUser, useAuth } from "@/firebase";
 import { collection, query, orderBy, doc, where, getDocs } from "firebase/firestore";
 import { setDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -243,6 +243,15 @@ function Admin1Content() {
     return approvedOrdersTotal - parseAmount(retailer.openingBalance) - paymentsTotal;
   };
 
+  const totals = useMemo(() => {
+    if (!filteredRequests) return { creditLimit: 0, outstanding: 0 };
+    return filteredRequests.reduce((acc, req) => {
+      acc.creditLimit += parseAmount(req.creditLimit);
+      acc.outstanding += calculateCurrentOS(req);
+      return acc;
+    }, { creditLimit: 0, outstanding: 0 });
+  }, [filteredRequests, allOrders, payments]);
+
   const handleDownloadLedger = (retailer: any) => {
     if (!allOrders || !payments) return;
     const masterId = retailer.id;
@@ -406,6 +415,15 @@ function Admin1Content() {
                       );
                     })}
                   </TableBody>
+                  <TableFooter className="bg-primary/5">
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={5} className="text-[10px] font-black uppercase text-right py-6">Registry Totals</TableCell>
+                      <TableCell className="font-black text-[10px] text-primary">₹{totals.creditLimit.toLocaleString()}</TableCell>
+                      <TableCell></TableCell>
+                      <TableCell className={cn("font-black text-[10px]", totals.outstanding > 0 ? "text-red-600" : "text-green-600")}>₹{totals.outstanding.toLocaleString()}</TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
+                  </TableFooter>
                 </Table>
               </div>
             </Card>
