@@ -56,14 +56,15 @@
         "id": { "type": "string" },
         "name": { "type": "string" },
         "description": { "type": "string" },
-        "imageUrl": { "type": "string", "description": "URL of the product image." },
+        "imageUrl": { "type": "string", "description": "Legacy single image URL." },
+        "imageUrls": { "type": "array", "items": { "type": "string" }, "description": "Array of up to 3 image URLs." },
         "price": { "type": "number" },
         "mrp": { "type": "number" },
-        "margin": { "type": "number", "description": "Percentage discount from MRP to get wholesale price." },
+        "margin": { "type": "number" },
         "stockQuantity": { "type": "number" },
         "categoryId": { "type": "string" },
         "hsn": { "type": "string", "default": "6403" },
-        "displayOrder": { "type": "number", "description": "Manual display sequence for the catalog." }
+        "displayOrder": { "type": "number" }
       }
     },
     "CarouselSlide": {
@@ -85,7 +86,7 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "userId": { "type": "string", "description": "UID of the retailer." },
+        "userId": { "type": "string" },
         "items": { "type": "array", "items": { "type": "object" } },
         "totalAmount": { "type": "number" },
         "status": { "type": "string", "enum": ["Processing", "Approved", "Shipped", "Delivered", "Cancelled"] },

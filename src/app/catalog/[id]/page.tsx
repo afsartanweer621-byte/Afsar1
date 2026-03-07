@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -22,6 +23,7 @@ import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from "@
 import { collection, doc } from "firebase/firestore";
 import { useCart } from "@/context/CartContext";
 import { FALLBACK_PRODUCTS } from "@/lib/fallback-products";
+import { cn } from "@/lib/utils";
 
 export default function ArticleDetailPage() {
   const params = useParams();
@@ -34,6 +36,7 @@ export default function ArticleDetailPage() {
 
   const [quantity, setQuantity] = useState("");
   const [mounted, setMounted] = useState(false);
+  const [activeImageIdx, setActiveImageIdx] = useState(0);
 
   const profileRef = useMemoFirebase(() => 
     user ? doc(db, "AuthorizedUsers", user.uid) : null, 
@@ -49,14 +52,17 @@ export default function ArticleDetailPage() {
 
   const product = useMemo(() => {
     if (loadingProducts || !id) return null;
-    
-    // Check Firestore first
     const fromFirestore = firestoreProducts?.find(p => p.id === id);
     if (fromFirestore) return fromFirestore;
-    
-    // Check Fallback
     return FALLBACK_PRODUCTS.find(p => p.id === id);
   }, [firestoreProducts, loadingProducts, id]);
+
+  const images = useMemo(() => {
+    if (!product) return [];
+    const urls = product.imageUrls && Array.isArray(product.imageUrls) ? product.imageUrls.filter(Boolean) : [];
+    if (urls.length === 0 && product.imageUrl) urls.push(product.imageUrl);
+    return urls;
+  }, [product]);
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -134,18 +140,18 @@ export default function ArticleDetailPage() {
           {/* Product Image Section */}
           <div className="space-y-4">
             <div className="relative aspect-square bg-primary/5 border border-primary/5 overflow-hidden group">
-              {product.imageUrl ? (
+              {images.length > 0 ? (
                 <Image 
-                  src={product.imageUrl} 
+                  src={images[activeImageIdx]} 
                   alt={product.name} 
                   fill 
-                  className="object-cover transition-transform duration-700 group-hover:scale-105"
+                  className="object-cover transition-transform duration-700"
                   priority
                 />
               ) : (
                 <div className="h-full w-full flex flex-col items-center justify-center opacity-10">
                   <Package className="h-12 w-12 mb-2" />
-                  <span className="text-[8px] font-black uppercase">Visual Preview Unavailable</span>
+                  <span className="text-[8px] font-black uppercase">No Visuals</span>
                 </div>
               )}
               <div className="absolute top-3 right-3">
@@ -154,6 +160,24 @@ export default function ArticleDetailPage() {
                 </Badge>
               </div>
             </div>
+            
+            {/* Thumbnails */}
+            {images.length > 1 && (
+              <div className="flex gap-2">
+                {images.map((img, idx) => (
+                  <button 
+                    key={idx}
+                    onClick={() => setActiveImageIdx(idx)}
+                    className={cn(
+                      "relative h-16 w-16 bg-primary/5 border transition-all",
+                      activeImageIdx === idx ? "border-accent ring-1 ring-accent" : "border-primary/10 opacity-60 hover:opacity-100"
+                    )}
+                  >
+                    <Image src={img} alt="" fill className="object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
             
             <div className="grid grid-cols-3 gap-2">
               <div className="bg-primary/5 p-3 flex flex-col items-center justify-center gap-1">
