@@ -117,12 +117,8 @@ function AdminContent() {
   const { data: notifications } = useCollection(notificationsQuery);
 
   const mergedProducts = useMemo(() => {
-    if (loadingProducts) return [];
-    
     const base = [...FALLBACK_PRODUCTS];
-    if (!firestoreProducts || firestoreProducts.length === 0) {
-      return base.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
-    }
+    if (!firestoreProducts) return base.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
 
     const firestoreMap = new Map(firestoreProducts.map(p => [p.id, p]));
     
@@ -142,7 +138,7 @@ function AdminContent() {
     return merged
       .filter(p => !p.deleted)
       .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
-  }, [firestoreProducts, loadingProducts]);
+  }, [firestoreProducts]);
 
   const filteredProducts = useMemo(() => {
     if (!productSearch) return mergedProducts;
@@ -185,9 +181,11 @@ function AdminContent() {
           const productRef = doc(db, "Products", item.id);
           const qtyToReduce = Math.abs(parseInt(String(item.quantity)) || 0);
           if (qtyToReduce > 0) {
-            updateDocumentNonBlocking(productRef, {
+            // Use setDocumentNonBlocking with merge: true for robust inventory sync
+            // This handles cases where the product doesn't exist in Firestore yet (fallback)
+            setDocumentNonBlocking(productRef, {
               stockQuantity: increment(-qtyToReduce)
-            });
+            }, { merge: true });
           }
         }
       });
@@ -203,14 +201,6 @@ function AdminContent() {
     if (!order || !order.id) return;
     const wasApproved = order.status === "Approved";
     
-    // Safety check for approved orders
-    if (wasApproved) {
-      const confirmed = window.confirm(
-        "WARNING: This order is already APPROVED. Rejection will automatically REVERSE the stock decrement and return items to active inventory. Proceed?"
-      );
-      if (!confirmed) return;
-    }
-
     const orderRef = doc(db, "Orders", order.id);
     
     // 1. Update Status to Cancelled
@@ -226,9 +216,10 @@ function AdminContent() {
           const productRef = doc(db, "Products", item.id);
           const qtyToRestore = Math.abs(parseInt(String(item.quantity)) || 0);
           if (qtyToRestore > 0) {
-            updateDocumentNonBlocking(productRef, {
+            // Atomic reversal using setDocumentNonBlocking with merge
+            setDocumentNonBlocking(productRef, {
               stockQuantity: increment(qtyToRestore)
-            });
+            }, { merge: true });
           }
         }
       });
@@ -514,7 +505,11 @@ function AdminContent() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredProducts.map((p) => (
+                    {loadingProducts ? (
+                      <TableRow><TableCell colSpan={5} className="text-center py-20 uppercase font-black text-[10px] animate-pulse">Syncing Inventory...</TableCell></TableRow>
+                    ) : filteredProducts.length === 0 ? (
+                      <TableRow><TableCell colSpan={5} className="text-center py-20 uppercase font-black text-[10px] opacity-20">No matching articles</TableCell></TableRow>
+                    ) : filteredProducts.map((p) => (
                       <TableRow key={p.id} className="border-primary/5">
                         <TableCell>
                           <div className="relative h-8 w-8 bg-primary/5">
@@ -715,7 +710,15 @@ function AdminContent() {
               )}
               {editingOrder?.status !== 'Cancelled' && (
                 <Button 
-                  onClick={() => { handleCancelOrder(editingOrder); setEditingOrder(null); }} 
+                  onClick={() => { 
+                    const wasApproved = editingOrder.status === "Approved";
+                    if (wasApproved) {
+                      const confirmed = window.confirm("WARNING: This order is already APPROVED. Rejection will automatically REVERSE the stock decrement. Proceed?");
+                      if (!confirmed) return;
+                    }
+                    handleCancelOrder(editingOrder); 
+                    setEditingOrder(null); 
+                  }} 
                   variant="destructive" 
                   className="flex-1 h-14 rounded-none uppercase font-black text-[11px] tracking-widest gap-2"
                 >
@@ -727,7 +730,7 @@ function AdminContent() {
             <div className="p-4 bg-secondary/5 border-l-4 border-accent">
               <p className="text-[10px] font-black uppercase text-accent mb-1">Stock Integrity Protocol</p>
               <p className="text-[9px] opacity-60 font-medium uppercase leading-relaxed">
-                Rejecting an approved order will automatically return all units to active inventory. 
+                Rejecting an approved order will automatically return all units to active inventory using atomic increments. 
                 Applying edits will sync with the retailer's outstanding balance immediately.
               </p>
             </div>
