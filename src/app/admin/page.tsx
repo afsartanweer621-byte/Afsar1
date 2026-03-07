@@ -254,7 +254,10 @@ function AdminContent() {
       }
     });
     
-    return merged.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+    // Filter out items marked as deleted
+    return merged
+      .filter(p => !p.deleted)
+      .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
   }, [firestoreProducts, loadingProducts]);
 
   const filteredProducts = useMemo(() => {
@@ -409,6 +412,7 @@ function AdminContent() {
             margin: margin,
             hsn: rowData.hsn || "6403",
             stockQuantity: qty,
+            deleted: false, // Ensure re-added products are visible
             updatedAt: new Date().toISOString()
           };
 
@@ -562,7 +566,13 @@ function AdminContent() {
   const handleConfirmDeleteProduct = () => {
     if (!productToDelete) return;
     const productRef = doc(db, "Products", productToDelete);
-    deleteDocumentNonBlocking(productRef);
+    
+    // Using soft-delete with a flag to handle both firestore and hardcoded articles
+    setDocumentNonBlocking(productRef, { 
+      deleted: true,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+
     setProductToDelete(null);
     toast({ title: "Article Deleted", description: "The article has been removed from the active registry." });
   };
@@ -588,6 +598,7 @@ function AdminContent() {
       hsn: editingProduct.hsn || "6403",
       stockQuantity: parseInt(editingProduct.stockQuantity) || 0,
       displayOrder: parseInt(editingProduct.displayOrder) || 0,
+      deleted: false, // Ensure it's not marked as deleted if being edited/saved
       updatedAt: new Date().toISOString()
     }, { merge: true });
     
@@ -625,6 +636,7 @@ function AdminContent() {
       price: 0,
       hsn: "6403",
       imageUrl: "",
+      deleted: false,
       displayOrder: mergedProducts.length + 1
     });
   };

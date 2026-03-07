@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -82,7 +83,10 @@ export default function CatalogPage() {
       }
     });
     
-    return merged.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+    // Sync with Admin soft-delete flag
+    return merged
+      .filter(p => !p.deleted)
+      .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
   }, [firestoreProducts, loadingProducts]);
 
   const filteredProducts = useMemo(() => {
