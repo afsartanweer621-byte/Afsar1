@@ -76,6 +76,7 @@ function AdminContent() {
   
   const [activeTab, setActiveTab] = useState("orders");
   const [editingOrder, setEditingOrder] = useState<any>(null);
+  const [orderToDelete, setOrderToDelete] = useState<any>(null);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [productToDelete, setProductToDelete] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -191,7 +192,6 @@ function AdminContent() {
           const productRef = doc(db, "Products", item.id);
           const qtyToReduce = Math.abs(parseInt(String(item.quantity)) || 0);
           if (qtyToReduce > 0) {
-            // Use setDocumentNonBlocking with merge: true for robust inventory sync
             setDocumentNonBlocking(productRef, {
               stockQuantity: increment(-qtyToReduce)
             }, { merge: true });
@@ -225,7 +225,6 @@ function AdminContent() {
           const productRef = doc(db, "Products", item.id);
           const qtyToRestore = Math.abs(parseInt(String(item.quantity)) || 0);
           if (qtyToRestore > 0) {
-            // Atomic reversal using setDocumentNonBlocking with merge
             setDocumentNonBlocking(productRef, {
               stockQuantity: increment(qtyToRestore)
             }, { merge: true });
@@ -239,6 +238,34 @@ function AdminContent() {
     } else {
       toast({ title: "Order Cancelled", description: `Order #${order.id.slice(0,8)} has been rejected.` });
     }
+  };
+
+  const handleDeleteOrder = (order: any) => {
+    if (!order || !order.id) return;
+    const wasApproved = order.status === "Approved";
+    
+    // 1. Reverse Stock IF it was Approved
+    if (wasApproved && order.items && Array.isArray(order.items)) {
+      order.items.forEach((item: any) => {
+        if (item.id) {
+          const productRef = doc(db, "Products", item.id);
+          const qtyToRestore = Math.abs(parseInt(String(item.quantity)) || 0);
+          if (qtyToRestore > 0) {
+            setDocumentNonBlocking(productRef, {
+              stockQuantity: increment(qtyToRestore)
+            }, { merge: true });
+          }
+        }
+      });
+    }
+
+    // 2. Purge order from registry
+    deleteDocumentNonBlocking(doc(db, "Orders", order.id));
+    setOrderToDelete(null);
+    toast({ 
+      title: "Order Purged", 
+      description: `Order #${order.id.slice(0,8)} removed and inventory synced.` 
+    });
   };
 
   const handleSendNotification = () => {
@@ -459,12 +486,22 @@ function AdminContent() {
                         <TableCell className="text-[10px] font-bold">{order.items?.length || 0} SKU</TableCell>
                         <TableCell className="font-black text-[10px]">₹{order.totalAmount?.toLocaleString()}</TableCell>
                         <TableCell>
-                          <Badge className={cn("rounded-none text-[8px] font-black uppercase", 
-                            order.status === 'Approved' ? "bg-green-100 text-green-700" : 
-                            order.status === 'Cancelled' ? "bg-red-100 text-red-700" : 
-                            "bg-amber-100 text-amber-700")}>
-                            {order.status}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge className={cn("rounded-none text-[8px] font-black uppercase", 
+                              order.status === 'Approved' ? "bg-green-100 text-green-700" : 
+                              order.status === 'Cancelled' ? "bg-red-100 text-red-700" : 
+                              "bg-amber-100 text-amber-700")}>
+                              {order.status}
+                            </Badge>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => setOrderToDelete(order)}
+                              className="h-6 w-6 text-destructive/40 hover:text-destructive hover:bg-destructive/5 p-0"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
@@ -747,6 +784,7 @@ function AdminContent() {
         </DialogContent>
       </Dialog>
 
+      {/* Product Delete Alert */}
       <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
         <AlertDialogContent className="rounded-none border-none">
           <AlertDialogHeader>
@@ -772,6 +810,33 @@ function AdminContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Order Delete Alert */}
+      <AlertDialog open={!!orderToDelete} onOpenChange={(open) => !open && setOrderToDelete(null)}>
+        <AlertDialogContent className="rounded-none border-none">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-2 text-destructive mb-2">
+              <AlertTriangle className="h-5 w-5" />
+              <AlertDialogTitle className="uppercase font-black tracking-tighter text-xl">Purge Order</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-[11px] font-medium uppercase tracking-widest leading-relaxed">
+              Deleting this order will permanently remove it from the registry. 
+              {orderToDelete?.status === 'Approved' && (
+                <span className="block mt-2 font-bold text-accent">
+                  CRITICAL: Since this order was APPROVED, all items will be AUTOMATICALLY REVERSED back to your active inventory.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-6">
+            <AlertDialogCancel className="rounded-none uppercase font-black text-[10px] tracking-widest h-12">Keep Order</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleDeleteOrder(orderToDelete)} className="rounded-none bg-destructive text-destructive-foreground hover:bg-destructive/90 uppercase font-black text-[10px] tracking-widest h-12">
+              Delete & Sync
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+
