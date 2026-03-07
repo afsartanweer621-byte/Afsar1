@@ -2,12 +2,13 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
-import { Search, Loader2, ShoppingCart, Package, ChevronLeft, ChevronRight, Percent } from "lucide-react";
+import { Search, Loader2, ShoppingCart, Package, ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
@@ -101,7 +102,10 @@ export default function CatalogPage() {
     setQuantities(prev => ({ ...prev, [productId]: value }));
   };
 
-  const handleAddToCart = (product: any) => {
+  const handleAddToCart = (product: any, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
     const qtyInput = quantities[product.id] || "0";
     const qty = parseInt(qtyInput);
     
@@ -157,7 +161,7 @@ export default function CatalogPage() {
             Product <span className="text-accent">Catalog</span>.
           </h1>
           <p className="text-[8px] font-black uppercase tracking-widest text-accent opacity-80">
-            * All items must be ordered in multiples of 4 pieces.
+            * All items must be ordered in multiples of 4 pieces. Click article to view full details.
           </p>
         </header>
 
@@ -179,23 +183,28 @@ export default function CatalogPage() {
 
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
             {paginatedProducts.map((product) => (
-              <div key={product.id} className="group flex flex-col bg-white border border-primary/5 hover:border-accent/10 transition-all overflow-hidden shadow-sm">
+              <div key={product.id} className="group flex flex-col bg-white border border-primary/5 hover:border-accent/10 transition-all overflow-hidden shadow-sm relative">
+                <Link href={`/catalog/${product.id}`} className="absolute inset-0 z-0" />
+                
                 <div className="relative h-20 md:h-24 w-full bg-primary/5">
                   {product.imageUrl ? (
                     <Image 
                       src={product.imageUrl} 
                       alt={product.name} 
                       fill 
-                      className="object-cover"
+                      className="object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                   ) : (
                     <div className="h-full w-full flex items-center justify-center opacity-5">
                       <Package className="h-4 w-4" />
                     </div>
                   )}
+                  <div className="absolute inset-0 bg-primary/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                    <ArrowRight className="text-white h-6 w-6" />
+                  </div>
                 </div>
                 
-                <div className="p-1.5 space-y-1">
+                <div className="p-1.5 space-y-1 relative z-10 pointer-events-none">
                   <h3 className="text-[9px] md:text-[10px] font-bold uppercase tracking-tighter leading-tight font-lato truncate">
                     {product.name}
                   </h3>
@@ -218,19 +227,20 @@ export default function CatalogPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 pointer-events-auto">
                       <Input 
                         type="number" 
                         placeholder="0"
                         step="4"
                         min="0"
-                        className="rounded-none border-primary/10 h-8 font-black text-center text-xs w-14 p-0"
+                        className="rounded-none border-primary/10 h-10 font-black text-center text-sm w-16 p-0"
                         value={quantities[product.id] || ""}
                         onChange={(e) => handleQtyChange(product.id, e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
                       />
                       <Button 
-                        onClick={() => handleAddToCart(product)}
-                        className="flex-1 bg-primary text-background hover:bg-accent rounded-none font-black uppercase text-[9px] tracking-widest h-8 px-0"
+                        onClick={(e) => handleAddToCart(product, e)}
+                        className="flex-1 bg-primary text-background hover:bg-accent rounded-none font-black uppercase text-[9px] tracking-widest h-10 px-0"
                       >
                         ADD <ShoppingCart className="ml-2 h-3 w-3" />
                       </Button>
