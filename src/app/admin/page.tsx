@@ -161,13 +161,28 @@ function AdminContent() {
 
   const handleApproveOrder = (order: any) => {
     const orderRef = doc(db, "Orders", order.id);
+    
+    // 1. Update Order Status & Financials
     updateDocumentNonBlocking(orderRef, {
       status: "Approved",
       items: order.items,
       totalAmount: order.totalAmount,
       updatedAt: new Date().toISOString()
     });
-    toast({ title: "Order Approved", description: `Order #${order.id.slice(0,8)} is now confirmed with final edits.` });
+
+    // 2. Sync Inventory (Reduce Stock)
+    order.items.forEach((item: any) => {
+      const productRef = doc(db, "Products", item.id);
+      // Use firestore increment to safely reduce stock quantity
+      updateDocumentNonBlocking(productRef, {
+        stockQuantity: increment(-item.quantity)
+      });
+    });
+
+    toast({ 
+      title: "Order Approved & Stock Synced", 
+      description: `Order #${order.id.slice(0,8)} finalized. Inventory levels adjusted.` 
+    });
   };
 
   const handleRejectOrder = (order: any) => {
@@ -668,7 +683,7 @@ function AdminContent() {
             <div className="p-4 bg-secondary/5 border-l-4 border-accent">
               <p className="text-[10px] font-black uppercase text-accent mb-1">Financial Note</p>
               <p className="text-[9px] opacity-60 font-medium uppercase leading-relaxed">
-                Applying edits here will update the registry record and the retailer's outstanding balance immediately upon approval.
+                Applying edits here will update the registry record, reduce inventory stock, and update the retailer's outstanding balance immediately upon approval.
               </p>
             </div>
           </div>
