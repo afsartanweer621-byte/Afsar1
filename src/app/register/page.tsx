@@ -2,12 +2,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useFirestore, useAuth, useUser } from "@/firebase";
+import { useFirestore, useAuth, useUser, useDoc, useMemoFirebase } from "@/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import { signInAnonymously } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -17,16 +18,47 @@ import Link from "next/link";
 export default function RegisterPage() {
   const db = useFirestore();
   const auth = useAuth();
+  const router = useRouter();
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  // Initialize Anonymous Auth on mount to secure the submission flow as per security rules
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // 1. Check for an already authorized profile to prevent re-registration
+  const profileRef = useMemoFirebase(() => 
+    user ? doc(db, "AuthorizedUsers", user.uid) : null, 
+  [db, user]);
+  const { data: profile, isLoading: isProfileLoading } = useDoc(profileRef);
+
+  // 2. Check if a request was already submitted by this session UID
+  const requestCheckRef = useMemoFirebase(() => 
+    user ? doc(db, "PendingRequests", user.uid) : null, 
+  [db, user]);
+  const { data: existingRequest, isLoading: isRequestLoading } = useDoc(requestCheckRef);
+
+  // Redirect if already authorized
+  useEffect(() => {
+    if (mounted && !isUserLoading && !isProfileLoading && profile) {
+      router.push("/catalog");
+    }
+  }, [mounted, user, profile, isUserLoading, isProfileLoading, router]);
+
+  // Persist the "Submitted" view if a record exists in Firestore
+  useEffect(() => {
+    if (existingRequest && !isSubmitted) {
+      setIsSubmitted(true);
+    }
+  }, [existingRequest, isSubmitted]);
+
+  // Initialize Anonymous Auth on mount to secure the submission flow
   useEffect(() => {
     if (!user && !isUserLoading) {
       signInAnonymously(auth).catch((err) => {
-        // Silent fail or minimal logging - auth is required for the 'create' rule on PendingRequests
         console.error("Registry session initialization failed:", err);
       });
     }
@@ -44,7 +76,6 @@ export default function RegisterPage() {
       return;
     }
 
-    // Basic validation
     const rawPhone = form.phone.replace(/[^0-9]/g, '');
     const phoneDigitsOnly = rawPhone.startsWith('91') && rawPhone.length > 10 ? rawPhone.slice(2) : rawPhone;
     
@@ -75,13 +106,9 @@ export default function RegisterPage() {
     setIsLoading(true);
     try {
       const normalizedPhone = "+91" + phoneDigitsOnly;
-      
-      // We use the authenticated user's UID as the document ID for the request
       const requestId = user.uid;
-      
       const requestRef = doc(db, "PendingRequests", requestId);
       
-      // ONLY create the PendingRequest. AuthorizedUsers creation is handled by admin/backend approval.
       await setDoc(requestRef, {
         id: requestId,
         firmName: form.firmName,
@@ -103,6 +130,14 @@ export default function RegisterPage() {
     }
   };
 
+  if (!mounted || isUserLoading || isProfileLoading || isRequestLoading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-accent" />
+      </div>
+    );
+  }
+
   if (isSubmitted) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center space-y-12">
@@ -113,9 +148,9 @@ export default function RegisterPage() {
           <div className="space-y-4">
             <h1 className="text-4xl font-black uppercase tracking-tighter text-primary">Application Pending</h1>
             <p className="text-muted-foreground font-medium uppercase text-[10px] tracking-widest leading-loose">
-              Thank you for applying, <span className="text-primary font-bold">{form.firmName}</span>. 
-              Our team is currently verifying your business credentials (GST: {form.gst}). 
-              We will contact you at <span className="text-primary font-bold">{form.phone}</span> with your unique access code once approved.
+              Thank you for applying. 
+              Our team is currently verifying your business credentials (GST: {existingRequest?.gst || form.gst}). 
+              We will contact you with your unique access code once approved.
             </p>
           </div>
           
