@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
-import { Search, Loader2, ShoppingCart, Package, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Loader2, ShoppingCart, Package, ChevronLeft, ChevronRight, Percent } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
@@ -195,9 +195,16 @@ export default function CatalogPage() {
                       <Package className="h-4 w-4" />
                     </div>
                   )}
-                  <Badge className="absolute top-1 right-1 bg-primary/90 text-[10px] font-black uppercase px-2 py-0.5 rounded-none border-none">
-                    AVL: {product.stockQuantity}
-                  </Badge>
+                  <div className="absolute top-1 left-1 flex flex-col gap-1">
+                    <Badge className="bg-primary/90 text-[10px] font-black uppercase px-2 py-0.5 rounded-none border-none">
+                      AVL: {product.stockQuantity}
+                    </Badge>
+                    {product.margin && (
+                      <Badge className="bg-accent text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-none border-none">
+                        {product.margin}% MARGIN
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 
                 <div className="p-1.5 space-y-1">
