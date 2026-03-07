@@ -156,7 +156,7 @@ export default function CatalogPage() {
       <div className="container mx-auto px-4 py-4 flex-grow">
         <header className="mb-4 space-y-0.5">
           <h1 className="text-xl md:text-3xl font-black uppercase tracking-tighter leading-none text-primary">
-            Registry <span className="text-accent">Articles</span>.
+            Product <span className="text-accent">Catalog</span>.
           </h1>
           <p className="text-[8px] font-black uppercase tracking-widest text-accent opacity-80">
             * All items must be ordered in multiples of 4 pieces.
