@@ -32,7 +32,8 @@ import {
   X,
   CheckCircle2,
   Clock,
-  ExternalLink
+  ExternalLink,
+  RotateCcw
 } from "lucide-react";
 import { useFirestore, useCollection, useMemoFirebase, useUser, useAuth } from "@/firebase";
 import { collection, doc, query, orderBy, getDoc, setDoc, updateDoc, increment } from "firebase/firestore";
@@ -173,7 +174,6 @@ function AdminContent() {
     // 2. Sync Inventory (Reduce Stock)
     order.items.forEach((item: any) => {
       const productRef = doc(db, "Products", item.id);
-      // Use firestore increment to safely reduce stock quantity
       updateDocumentNonBlocking(productRef, {
         stockQuantity: increment(-item.quantity)
       });
@@ -185,13 +185,31 @@ function AdminContent() {
     });
   };
 
-  const handleRejectOrder = (order: any) => {
+  const handleCancelOrder = (order: any) => {
     const orderRef = doc(db, "Orders", order.id);
+    const wasApproved = order.status === "Approved";
+    
+    // 1. Update Status
     updateDocumentNonBlocking(orderRef, {
       status: "Cancelled",
       updatedAt: new Date().toISOString()
     });
-    toast({ title: "Order Cancelled", description: `Order #${order.id.slice(0,8)} has been rejected.` });
+
+    // 2. Reverse Stock if it was already Approved
+    if (wasApproved) {
+      order.items.forEach((item: any) => {
+        const productRef = doc(db, "Products", item.id);
+        updateDocumentNonBlocking(productRef, {
+          stockQuantity: increment(item.quantity)
+        });
+      });
+      toast({ 
+        title: "Order Rejected & Stock Reversed", 
+        description: `Order #${order.id.slice(0,8)} cancelled. Inventory levels restored.` 
+      });
+    } else {
+      toast({ title: "Order Cancelled", description: `Order #${order.id.slice(0,8)} has been rejected.` });
+    }
   };
 
   const handleSendNotification = () => {
@@ -330,7 +348,6 @@ function AdminContent() {
     reader.readAsText(file);
   };
 
-  // Helper to update items within the locally edited order
   const handleUpdateOrderItem = (idx: number, field: string, value: string) => {
     if (!editingOrder) return;
     
@@ -342,14 +359,11 @@ function AdminContent() {
     } else if (field === 'margin') {
       const marginVal = parseFloat(value) || 0;
       item.margin = marginVal;
-      // Re-calculate price based on MRP and new margin
-      const mrp = item.mrp || item.price / (1 - (item.margin / 100)); // Fallback calc if mrp not present
+      const mrp = item.mrp || item.price / (1 - (item.margin / 100)); 
       item.price = mrp * (1 - (marginVal / 100));
     }
     
     newItems[idx] = item;
-    
-    // Recalculate total
     const newTotal = newItems.reduce((acc, curr) => acc + (curr.price * curr.quantity), 0);
     
     setEditingOrder({
@@ -426,10 +440,10 @@ function AdminContent() {
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
                             {order.status === 'Processing' && (
-                              <>
-                                <Button size="sm" onClick={() => handleApproveOrder(order)} className="h-8 bg-green-600 text-white rounded-none uppercase font-black text-[8px] px-3">Approve</Button>
-                                <Button size="sm" onClick={() => handleRejectOrder(order)} variant="destructive" className="h-8 rounded-none uppercase font-black text-[8px] px-3">Reject</Button>
-                              </>
+                              <Button size="sm" onClick={() => handleApproveOrder(order)} className="h-8 bg-green-600 text-white rounded-none uppercase font-black text-[8px] px-3">Approve</Button>
+                            )}
+                            {order.status !== 'Cancelled' && (
+                              <Button size="sm" onClick={() => handleCancelOrder(order)} variant="destructive" className="h-8 rounded-none uppercase font-black text-[8px] px-3">Reject</Button>
                             )}
                             <Button variant="ghost" size="sm" onClick={() => setEditingOrder(order)} className="p-1"><ExternalLink className="h-3 w-3" /></Button>
                           </div>
@@ -662,28 +676,31 @@ function AdminContent() {
               </Table>
             </div>
 
-            {editingOrder?.status === 'Processing' && (
-              <div className="flex gap-4 pt-4">
+            <div className="flex flex-wrap gap-4 pt-4">
+              {editingOrder?.status === 'Processing' && (
                 <Button 
                   onClick={() => { handleApproveOrder(editingOrder); setEditingOrder(null); }} 
                   className="flex-1 h-14 bg-green-600 text-white rounded-none uppercase font-black text-[11px] tracking-widest"
                 >
                   Approve with Edits
                 </Button>
+              )}
+              {editingOrder?.status !== 'Cancelled' && (
                 <Button 
-                  onClick={() => { handleRejectOrder(editingOrder); setEditingOrder(null); }} 
+                  onClick={() => { handleCancelOrder(editingOrder); setEditingOrder(null); }} 
                   variant="destructive" 
-                  className="flex-1 h-14 rounded-none uppercase font-black text-[11px] tracking-widest"
+                  className="flex-1 h-14 rounded-none uppercase font-black text-[11px] tracking-widest gap-2"
                 >
-                  Reject Order
+                  <RotateCcw className="h-4 w-4" /> Reject & Reverse Stock
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
             
             <div className="p-4 bg-secondary/5 border-l-4 border-accent">
-              <p className="text-[10px] font-black uppercase text-accent mb-1">Financial Note</p>
+              <p className="text-[10px] font-black uppercase text-accent mb-1">Stock Integrity Protocol</p>
               <p className="text-[9px] opacity-60 font-medium uppercase leading-relaxed">
-                Applying edits here will update the registry record, reduce inventory stock, and update the retailer's outstanding balance immediately upon approval.
+                Rejecting an approved order will automatically return all units to active inventory. 
+                Applying edits will sync with the retailer's outstanding balance immediately.
               </p>
             </div>
           </div>
