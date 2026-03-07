@@ -104,9 +104,21 @@ export default function CatalogPage() {
   };
 
   const handleAddToCart = (product: any) => {
-    const qty = parseInt(quantities[product.id] || "0");
+    const qtyInput = quantities[product.id] || "0";
+    const qty = parseInt(qtyInput);
+    
     if (qty <= 0) {
       toast({ variant: "destructive", title: "Qty Required" });
+      return;
+    }
+
+    // ENFORCE MULTIPLE OF 4 PIECES
+    if (qty % 4 !== 0) {
+      toast({ 
+        variant: "destructive", 
+        title: "Wholesale Requirement", 
+        description: "Please order in multiples of 4 pieces (e.g., 4, 8, 12...)." 
+      });
       return;
     }
 
@@ -147,6 +159,9 @@ export default function CatalogPage() {
           <h1 className="text-xl md:text-3xl font-black uppercase tracking-tighter leading-none text-primary">
             Registry <span className="text-accent">Articles</span>.
           </h1>
+          <p className="text-[8px] font-black uppercase tracking-widest text-accent opacity-80">
+            * All items must be ordered in multiples of 4 pieces.
+          </p>
         </header>
 
         <div className="flex flex-col gap-3">
@@ -201,7 +216,9 @@ export default function CatalogPage() {
                       <Input 
                         type="number" 
                         placeholder="0"
-                        className="rounded-none border-primary/10 h-5 font-black text-center text-[7px] w-6 p-0"
+                        step="4"
+                        min="0"
+                        className="rounded-none border-primary/10 h-5 font-black text-center text-[7px] w-8 p-0"
                         value={quantities[product.id] || ""}
                         onChange={(e) => handleQtyChange(product.id, e.target.value)}
                       />
