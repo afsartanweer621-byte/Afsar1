@@ -220,34 +220,52 @@ export function Navbar() {
                     )}
                   </Button>
                 </SheetTrigger>
-                <SheetContent className="w-full sm:max-w-xs flex flex-col p-0 rounded-none shadow-2xl">
+                <SheetContent className="w-full sm:max-w-md flex flex-col p-0 rounded-none shadow-2xl border-l border-primary/10">
                   <SheetHeader className="p-6 border-b border-primary/10">
-                    <SheetTitle className="text-xl font-black uppercase tracking-tighter">Wholesale Cart</SheetTitle>
-                    <SheetDescription className="text-[8px] font-black uppercase text-accent">Review Order</SheetDescription>
+                    <SheetTitle className="text-2xl font-black uppercase tracking-tighter">Wholesale Cart</SheetTitle>
+                    <SheetDescription className="text-[10px] font-black uppercase text-accent tracking-widest">Review Registry Order</SheetDescription>
                   </SheetHeader>
                   <ScrollArea className="flex-grow">
-                    <div className="p-4 space-y-2">
+                    <div className="p-6 space-y-4">
                       {items.map((item) => (
-                        <div key={item.id} className="flex flex-col gap-0.5 py-2 border-b border-primary/5">
-                          <div className="flex justify-between items-start gap-2">
-                            <h4 className="text-[8px] font-black uppercase leading-tight flex-1">{item.name}</h4>
-                            <Button variant="ghost" size="icon" onClick={() => removeFromCart(item.id)} className="h-3 w-3"><Trash2 className="h-2 w-2" /></Button>
+                        <div key={item.id} className="flex flex-col gap-2 py-4 border-b border-primary/5 last:border-none">
+                          <div className="flex justify-between items-start gap-4">
+                            <div className="space-y-1 flex-1">
+                              <h4 className="text-[11px] font-black uppercase leading-tight tracking-tight">{item.name}</h4>
+                              <p className="text-[9px] font-bold text-primary/40 uppercase tracking-widest">SKU: {item.id}</p>
+                            </div>
+                            <Button variant="ghost" size="icon" onClick={() => removeFromCart(item.id)} className="h-6 w-6 text-destructive hover:bg-destructive/5"><Trash2 className="h-4 w-4" /></Button>
                           </div>
-                          <div className="flex items-center justify-between text-[7px] font-bold uppercase">
-                            <span>{item.quantity} UNITS</span>
-                            <div className="font-black">₹{(item.price * item.quantity).toLocaleString('en-IN')}</div>
+                          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest bg-secondary/5 p-2 border border-primary/5">
+                            <div className="flex items-center gap-2">
+                              <span className="opacity-40">Qty:</span>
+                              <span className="text-primary">{item.quantity} UNITS</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="opacity-40">Total:</span>
+                              <span className="text-primary">₹{(item.price * item.quantity).toLocaleString('en-IN')}</span>
+                            </div>
                           </div>
                         </div>
                       ))}
+                      {items.length === 0 && (
+                        <div className="h-full flex flex-col items-center justify-center py-20 text-center opacity-20">
+                          <ShoppingCart className="h-12 w-12 mb-4" />
+                          <p className="text-[10px] font-black uppercase tracking-[0.3em]">Registry Empty</p>
+                        </div>
+                      )}
                     </div>
                   </ScrollArea>
                   {items.length > 0 && (
-                    <div className="p-6 border-t border-primary/10 bg-secondary/5 space-y-4">
-                      <div className="flex justify-between items-end">
-                        <span className="text-[7px] font-black uppercase opacity-40">Total</span>
-                        <p className="text-xl font-black tracking-tighter">₹{cartTotal.toLocaleString('en-IN')}</p>
+                    <div className="p-8 border-t border-primary/10 bg-white space-y-6">
+                      <div className="flex justify-between items-end border-b border-primary/5 pb-4">
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-black uppercase tracking-[0.4em] opacity-40">Grand Order Total</span>
+                          <div className="text-[10px] font-bold text-accent uppercase tracking-widest">Incl. 5% GST</div>
+                        </div>
+                        <p className="text-3xl font-black tracking-tighter">₹{cartTotal.toLocaleString('en-IN')}</p>
                       </div>
-                      <Button onClick={handleCheckout} className="w-full h-12 bg-primary text-background rounded-none uppercase font-black text-[8px] tracking-widest">Finalize</Button>
+                      <Button onClick={handleCheckout} className="w-full h-16 bg-primary text-background hover:bg-accent transition-all rounded-none uppercase font-black text-[11px] tracking-[0.4em]">Finalize Sourcing Order</Button>
                     </div>
                   )}
                 </SheetContent>

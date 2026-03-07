@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -196,7 +195,7 @@ export default function CatalogPage() {
                       <Package className="h-4 w-4" />
                     </div>
                   )}
-                  <Badge className="absolute top-1 right-1 bg-primary/90 text-[5px] font-black uppercase px-1 py-0 rounded-none border-none">
+                  <Badge className="absolute top-1 right-1 bg-primary/90 text-[10px] font-black uppercase px-2 py-0.5 rounded-none border-none">
                     AVL: {product.stockQuantity}
                   </Badge>
                 </div>
@@ -218,15 +217,15 @@ export default function CatalogPage() {
                         placeholder="0"
                         step="4"
                         min="0"
-                        className="rounded-none border-primary/10 h-5 font-black text-center text-[7px] w-8 p-0"
+                        className="rounded-none border-primary/10 h-8 font-black text-center text-xs w-14 p-0"
                         value={quantities[product.id] || ""}
                         onChange={(e) => handleQtyChange(product.id, e.target.value)}
                       />
                       <Button 
                         onClick={() => handleAddToCart(product)}
-                        className="flex-1 bg-primary text-background hover:bg-accent rounded-none font-black uppercase text-[7px] tracking-widest h-5 px-0"
+                        className="flex-1 bg-primary text-background hover:bg-accent rounded-none font-black uppercase text-[9px] tracking-widest h-8 px-0"
                       >
-                        ADD <ShoppingCart className="ml-1 h-2 w-2" />
+                        ADD <ShoppingCart className="ml-2 h-3 w-3" />
                       </Button>
                     </div>
                   </div>
