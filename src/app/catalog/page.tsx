@@ -16,7 +16,7 @@ import { useCart } from "@/context/CartContext";
 import { HeroCarousel } from "@/components/home/HeroCarousel";
 import { FALLBACK_PRODUCTS } from "@/lib/fallback-products";
 
-const PRODUCTS_PER_PAGE = 50;
+const PRODUCTS_PER_PAGE = 25;
 
 export default function CatalogPage() {
   const router = useRouter();
