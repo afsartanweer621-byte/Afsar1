@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -215,7 +214,7 @@ function AdminContent() {
   const handleExportInventoryCSV = () => {
     if (!mergedProducts || mergedProducts.length === 0) return;
     
-    const headers = ["Article ID", "Name", "Category", "Current Qty", "MRP", "Margin %", "Wholesale Price (INR)"];
+    const headers = ["article_id", "name", "category", "quantity", "mrp", "margin", "price", "hsn"];
     const rows = mergedProducts.map(p => [
       p.id,
       p.name,
@@ -223,7 +222,8 @@ function AdminContent() {
       p.stockQuantity,
       p.mrp,
       p.margin || 0,
-      p.price.toFixed(2)
+      p.price.toFixed(2),
+      p.hsn || "6403"
     ]);
 
     const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
@@ -240,8 +240,8 @@ function AdminContent() {
   };
 
   const handleDownloadTemplateCSV = () => {
-    const headers = ["article_id", "name", "category", "quantity", "price", "mrp", "margin", "hsn"];
-    const exampleRow = ["SKU-101", "Classic Oxford", "Formal", "10", "1200", "1800", "33.33", "6403"];
+    const headers = ["article_id", "name", "category", "quantity", "mrp", "margin", "price", "hsn"];
+    const exampleRow = ["SKU-101", "Classic Oxford", "Formal", "10", "1800", "38", "1116", "6403"];
     
     const csvContent = [headers, exampleRow].map(e => e.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -265,6 +265,12 @@ function AdminContent() {
     reader.onload = async (event) => {
       const text = event.target?.result as string;
       const lines = text.split('\n').filter(l => l.trim() !== '');
+      if (lines.length < 2) {
+        setIsBulkProcessing(false);
+        toast({ variant: "destructive", title: "Invalid File", description: "CSV is empty or missing data." });
+        return;
+      }
+
       const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
       
       let successCount = 0;
@@ -281,13 +287,13 @@ function AdminContent() {
           continue;
         }
 
-        const qty = parseInt(rowData.quantity || rowData.stockquantity) || 0;
+        const qty = parseInt(rowData.quantity || rowData.stockquantity || "0") || 0;
         const mrp = parseFloat(rowData.mrp) || 0;
         const margin = parseFloat(rowData.margin) || 0;
         let price = parseFloat(rowData.price) || 0;
 
-        // If price is 0 but MRP and margin exist, auto calculate
-        if (price === 0 && mrp > 0 && margin > 0) {
+        // If price is 0 or not provided, calculate based on MRP and Margin
+        if ((price === 0 || isNaN(price)) && mrp > 0) {
           price = mrp * (1 - (margin / 100));
         }
 
@@ -295,26 +301,29 @@ function AdminContent() {
           const docRef = doc(db, "Products", articleId);
           const docSnap = await getDoc(docRef);
 
+          const payload = {
+            id: articleId,
+            name: rowData.name || articleId,
+            category: rowData.category || "General",
+            price: price,
+            mrp: mrp,
+            margin: margin,
+            hsn: rowData.hsn || "6403",
+            stockQuantity: qty,
+            updatedAt: new Date().toISOString()
+          };
+
           if (docSnap.exists()) {
+            // Update existing product
             await updateDoc(docRef, {
-              stockQuantity: increment(qty),
-              mrp: mrp,
-              margin: margin,
-              price: price,
-              updatedAt: new Date().toISOString()
+              ...payload,
+              stockQuantity: increment(qty) // Increment stock for bulk additions
             });
           } else {
+            // Create new product
             await setDoc(docRef, {
-              id: articleId,
-              name: rowData.name || articleId,
-              category: rowData.category || "General",
-              price: price,
-              mrp: mrp,
-              margin: margin,
-              hsn: rowData.hsn || "6403",
-              stockQuantity: qty,
-              displayOrder: mergedProducts.length + i,
-              updatedAt: new Date().toISOString()
+              ...payload,
+              displayOrder: mergedProducts.length + i
             });
           }
           successCount++;
@@ -928,7 +937,7 @@ function AdminContent() {
               </div>
             </div>
             <div className="space-y-1">
-              <Label className="text-[9px] font-black uppercase">SKU ID</Label>
+              <Label className="text-[9px] font-black uppercase">SKU ID (article_id)</Label>
               <Input placeholder="SKU ID" value={editingProduct?.id ?? ""} onChange={(e) => setEditingProduct({...editingProduct, id: e.target.value})} className="rounded-none text-[10px]" />
             </div>
             <div className="space-y-1">
