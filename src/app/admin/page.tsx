@@ -38,7 +38,7 @@ import {
 import { useFirestore, useCollection, useMemoFirebase, useUser, useAuth } from "@/firebase";
 import { collection, doc, query, orderBy, getDoc, setDoc, updateDoc, increment } from "firebase/firestore";
 import { setDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { signOut } from "firebase/auth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -160,6 +160,15 @@ function AdminContent() {
       (p.category?.toLowerCase() || "").includes(lowerSearch)
     );
   }, [mergedProducts, productSearch]);
+
+  const inventoryTotals = useMemo(() => {
+    return filteredProducts.reduce((acc, p) => {
+      const qty = parseInt(String(p.stockQuantity)) || 0;
+      acc.stock += qty;
+      acc.wsp += (p.price || 0) * qty;
+      return acc;
+    }, { stock: 0, wsp: 0 });
+  }, [filteredProducts]);
 
   const getRetailerName = (userId: string) => {
     const retailer = retailers?.find(r => r.id === userId || r.originalRequestId === userId);
@@ -404,6 +413,27 @@ function AdminContent() {
     reader.readAsText(file);
   };
 
+  const handleDownloadStockCSV = () => {
+    const headers = ["ID", "Name", "Category", "Stock", "MRP", "Margin"];
+    const rows = mergedProducts.map(p => [
+      p.id,
+      p.name,
+      p.category,
+      p.stockQuantity,
+      p.mrp,
+      p.margin
+    ]);
+
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `Inventory_Registry_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    
+    toast({ title: "Stock Exported", description: "Current inventory registry downloaded." });
+  };
+
   const handleUpdateOrderItem = (idx: number, field: string, value: string) => {
     if (!editingOrder) return;
     
@@ -528,6 +558,9 @@ function AdminContent() {
                 <Input placeholder="SEARCH ARTICLE..." className="pl-9 rounded-none h-10 text-[10px] uppercase font-bold" value={productSearch} onChange={(e) => setProductSearch(e.target.value)} />
               </div>
               <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                <Button onClick={handleDownloadStockCSV} variant="outline" className="flex-1 sm:flex-none h-10 rounded-none border-primary font-black text-[9px] uppercase tracking-widest gap-2">
+                  <Download className="h-4 w-4" /> Download Stock
+                </Button>
                 <Button onClick={() => bulkUploadRef.current?.click()} variant="outline" className="flex-1 sm:flex-none h-10 rounded-none border-primary font-black text-[9px] uppercase tracking-widest gap-2">
                   <FileUp className="h-4 w-4" /> Bulk Upload
                 </Button>
@@ -577,6 +610,14 @@ function AdminContent() {
                       </TableRow>
                     ))}
                   </TableBody>
+                  <TableFooter className="bg-primary/5">
+                    <TableRow className="hover:bg-transparent border-t border-primary/10">
+                      <TableCell colSpan={2} className="text-[10px] font-black uppercase text-right py-6">Selection Totals</TableCell>
+                      <TableCell className="font-mono text-[11px] font-bold text-accent">{inventoryTotals.stock} UNITS</TableCell>
+                      <TableCell className="font-black text-[11px] text-primary">₹{inventoryTotals.wsp.toLocaleString(undefined, { maximumFractionDigits: 0 })}</TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
+                  </TableFooter>
                 </Table>
               </div>
             </Card>
@@ -839,4 +880,3 @@ function AdminContent() {
     </div>
   );
 }
-
