@@ -33,7 +33,8 @@ import {
   AlertTriangle,
   FileUp,
   Download,
-  FileText
+  FileText,
+  Search
 } from "lucide-react";
 import { useFirestore, useCollection, useMemoFirebase, useUser, useAuth } from "@/firebase";
 import { collection, doc, query, orderBy, getDoc, setDoc, updateDoc, increment } from "firebase/firestore";
@@ -57,118 +58,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AdminAuthGuard } from "@/components/auth/AdminAuthGuard";
 
 const FALLBACK_PRODUCTS = [
-  { id: '1021-Prado-Hill', name: '1021-Prado Hill', stockQuantity: 26, mrp: 999, margin: '38%', price: 619.38, category: 'Prado Hill', hsn: '6403', displayOrder: 1 },
-  { id: '1032-Prado-Hill', name: '1032-Prado Hill', stockQuantity: 14, mrp: 999, margin: '38%', price: 619.38, category: 'Prado Hill', hsn: '6403', displayOrder: 2 },
-  { id: '1051-Prado-Hill', name: '1051-Prado Hill', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'Prado Hill', hsn: '6403', displayOrder: 3 },
-  { id: '1082-PradoHill', name: '1082-PradoHill', stockQuantity: 20, mrp: 999, margin: '38%', price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 4 },
-  { id: '1091-PradoHill', name: '1091-PradoHill', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 5 },
-  { id: '1102-PradoHill', name: '1102-PradoHill', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 6 },
-  { id: '1132-PradoHill', name: '1132-PradoHill', stockQuantity: 1, mrp: 999, margin: '38%', price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 7 },
-  { id: '1141-Prado-Hill', name: '1141-Prado Hill', stockQuantity: 1, mrp: 999, margin: '38%', price: 619.38, category: 'Prado Hill', hsn: '6403', displayOrder: 8 },
-  { id: '1142-PradoHill', name: '1142-PradoHill', stockQuantity: 32, mrp: 999, margin: '38%', price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 9 },
-  { id: '1162-PradoHill', name: '1162-PradoHill', stockQuantity: 14, mrp: 999, margin: '38%', price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 10 },
-  { id: '1192-PradoHill', name: '1192-PradoHill', stockQuantity: 29, mrp: 999, margin: '38%', price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 11 },
-  { id: '1232-PradoHill', name: '1232-PradoHill', stockQuantity: 11, mrp: 999, margin: '38%', price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 12 },
-  { id: '1261-PradoHill', name: '1261-PradoHill', stockQuantity: 6, mrp: 999, margin: '38%', price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 13 },
-  { id: '1272-PradoHill', name: '1272-PradoHill', stockQuantity: 1, mrp: 999, margin: '38%', price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 14 },
-  { id: '1321-PradoHill', name: '1321-PradoHill', stockQuantity: 49, mrp: 999, margin: '38%', price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 15 },
-  { id: '1421', name: '1421', stockQuantity: 30, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 16 },
-  { id: '1431', name: '1431', stockQuantity: 43, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 17 },
-  { id: '1451', name: '1451', stockQuantity: 1, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 18 },
-  { id: '1461', name: '1461', stockQuantity: 21, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 19 },
-  { id: '1481', name: '1481', stockQuantity: 3, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 20 },
-  { id: '1501', name: '1501', stockQuantity: 1, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 21 },
-  { id: '1551', name: '1551', stockQuantity: 3, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 22 },
-  { id: '1611', name: '1611', stockQuantity: 34, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 23 },
-  { id: '1621', name: '1621', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 24 },
-  { id: '1631', name: '1631', stockQuantity: 3, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 25 },
-  { id: '1641', name: '1641', stockQuantity: 17, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 26 },
-  { id: '1661', name: '1661', stockQuantity: 3, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 27 },
-  { id: '1671', name: '1671', stockQuantity: 20, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 28 },
-  { id: '1681', name: '1681', stockQuantity: 9, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 29 },
-  { id: '1691', name: '1691', stockQuantity: 1, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 30 },
-  { id: '1701', name: '1701', stockQuantity: 1, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 31 },
-  { id: '1704', name: '1704', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 32 },
-  { id: '1708', name: '1708', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 33 },
-  { id: '1721', name: '1721', stockQuantity: 28, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 34 },
-  { id: '1806-Prado-Hill', name: '1806-Prado Hill', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'Prado Hill', hsn: '6403', displayOrder: 35 },
-  { id: '1807', name: '1807', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 36 },
-  { id: '1814', name: '1814', stockQuantity: 10, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 37 },
-  { id: '1816', name: '1816', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 38 },
-  { id: '1871', name: '1871', stockQuantity: 7, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 39 },
-  { id: '1872-PH', name: '1872-PH', stockQuantity: 16, mrp: 999, margin: '38%', price: 619.38, category: 'Prado Hill', hsn: '6403', displayOrder: 40 },
-  { id: '1902', name: '1902', stockQuantity: 31, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 41 },
-  { id: '1903', name: '1903', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 42 },
-  { id: '1904', name: '1904', stockQuantity: 30, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 43 },
-  { id: '2024', name: '2024', stockQuantity: 24, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 44 },
-  { id: '2025', name: '2025', stockQuantity: 16, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 45 },
-  { id: '2026', name: '2026', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 46 },
-  { id: '3101', name: '3101', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 47 },
-  { id: '3102', name: '3102', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 48 },
-  { id: '3108', name: '3108', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 49 },
-  { id: '3109', name: '3109', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 50 },
-  { id: '4105', name: '4105', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 51 },
-  { id: '4109', name: '4109', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 52 },
-  { id: '5102', name: '5102', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 53 },
-  { id: '5103', name: '5103', stockQuantity: 3, mrp: 999, margin: '38%', price: 619.38, category: 'Classic', hsn: '6403', displayOrder: 54 },
-  { id: '8262-SnakeHorn', name: '8262-SnakeHorn', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'SnakeHorn', hsn: '6403', displayOrder: 55 },
-  { id: '8272-SnakeHorn', name: '8272-SnakeHorn', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'SnakeHorn', hsn: '6403', displayOrder: 56 },
-  { id: 'A2305T', name: 'A2305T', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 57 },
-  { id: 'A2311T', name: 'A2311T', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 58 },
-  { id: 'A2314T', name: 'A2314T', stockQuantity: 1, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 59 },
-  { id: 'A2315T', name: 'A2315T', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 60 },
-  { id: 'A2319T', name: 'A2319T', stockQuantity: 12, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 61 },
-  { id: 'A2328T', name: 'A2328T', stockQuantity: 12, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 62 },
-  { id: 'A2334T', name: 'A2334T', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 63 },
-  { id: 'A2343T', name: 'A2343T', stockQuantity: 16, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 64 },
-  { id: 'A2344T', name: 'A2344T', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 65 },
-  { id: 'A2345T', name: 'A2345T', stockQuantity: 12, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 66 },
-  { id: 'A2346T', name: 'A2346T', stockQuantity: 16, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 67 },
-  { id: 'A23471', name: 'A23471', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 68 },
-  { id: 'A2348T', name: 'A2348T', stockQuantity: 20, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 69 },
-  { id: 'A2349T', name: 'A2349T', stockQuantity: 16, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 70 },
-  { id: 'A2350T', name: 'A2350T', stockQuantity: 16, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 71 },
-  { id: 'A2351T', name: 'A2351T', stockQuantity: 12, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 72 },
-  { id: 'A2354T', name: 'A2354T', stockQuantity: 12, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 73 },
-  { id: 'A2355T', name: 'A2355T', stockQuantity: 12, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 74 },
-  { id: 'A2356T', name: 'A2356T', stockQuantity: 12, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 75 },
-  { id: 'A2358T', name: 'A2358T', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 76 },
-  { id: 'A2359T', name: 'A2359T', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 77 },
-  { id: 'A2361T', name: 'A2361T', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 78 },
-  { id: 'A2362T', name: 'A2362T', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'T-Series', hsn: '6403', displayOrder: 79 },
-  { id: 'Dummy', name: 'Dummy', stockQuantity: 2, mrp: 999, margin: '38%', price: 619.38, category: 'Test', hsn: '6403', displayOrder: 80 },
-  { id: '13101N', name: '13101N', stockQuantity: 12, mrp: 999, margin: '38%', price: 619.38, category: 'N-Series', hsn: '6403', displayOrder: 81 },
-  { id: '13103N', name: '13103N', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'N-Series', hsn: '6403', displayOrder: 82 },
-  { id: '13105N', name: '13105N', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'N-Series', hsn: '6403', displayOrder: 83 },
-  { id: '13106N', name: '13106N', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'N-Series', hsn: '6403', displayOrder: 84 },
-  { id: '13107N', name: '13107N', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'N-Series', hsn: '6403', displayOrder: 85 },
-  { id: '13109N', name: '13109N', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'N-Series', hsn: '6403', displayOrder: 86 },
-  { id: '13110N', name: '13110N', stockQuantity: 12, mrp: 999, margin: '38%', price: 619.38, category: 'N-Series', hsn: '6403', displayOrder: 87 },
-  { id: '13112N', name: '13112N', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'N-Series', hsn: '6403', displayOrder: 88 },
-  { id: '13116N', name: '13116N', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'N-Series', hsn: '6403', displayOrder: 89 },
-  { id: '13117N', name: '13117N', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'N-Series', hsn: '6403', displayOrder: 90 },
-  { id: '13118N', name: '13118N', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'N-Series', hsn: '6403', displayOrder: 91 },
-  { id: '13119N', name: '13119N', stockQuantity: 16, mrp: 999, margin: '38%', price: 619.38, category: 'N-Series', hsn: '6403', displayOrder: 92 },
-  { id: '13120N', name: '13120N', stockQuantity: 16, mrp: 999, margin: '38%', price: 619.38, category: 'N-Series', hsn: '6403', displayOrder: 93 },
-  { id: '13121N', name: '13121N', stockQuantity: 24, mrp: 999, margin: '38%', price: 619.38, category: 'N-Series', hsn: '6403', displayOrder: 94 },
-  { id: '13122N', name: '13122N', stockQuantity: 24, mrp: 999, margin: '38%', price: 619.38, category: 'N-Series', hsn: '6403', displayOrder: 95 },
-  { id: '13123N', name: '13123N', stockQuantity: 24, mrp: 999, margin: '38', price: 619.38, category: 'N-Series', hsn: '6403', displayOrder: 96 },
-  { id: '13124N', name: '13124N', stockQuantity: 24, mrp: 999, margin: '38%', price: 619.38, category: 'N-Series', hsn: '6403', displayOrder: 97 },
-  { id: '13125N', name: '13125N', stockQuantity: 24, mrp: 999, margin: '38%', price: 619.38, category: 'N-Series', hsn: '6403', displayOrder: 98 },
-  { id: '13126N', name: '13126N', stockQuantity: 24, mrp: 999, margin: '38%', price: 619.38, category: 'N-Series', hsn: '6403', displayOrder: 99 },
-  { id: 'LP-8104', name: 'LP-8104', stockQuantity: 1, mrp: 999, margin: '38%', price: 619.38, category: 'LP-Series', hsn: '6403', displayOrder: 100 },
-  { id: 'LP-8105', name: 'LP-8105', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'LP-Series', hsn: '6403', displayOrder: 101 },
-  { id: 'LP-8106', name: 'LP-8106', stockQuantity: 12, mrp: 999, margin: '38%', price: 619.38, category: 'LP-Series', hsn: '6403', displayOrder: 102 },
-  { id: 'LP-8107', name: 'LP-8107', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'LP-Series', hsn: '6403', displayOrder: 103 },
-  { id: 'LP-8201', name: 'LP-8201', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'LP-Series', hsn: '6403', displayOrder: 104 },
-  { id: 'LP-8203', name: 'LP-8203', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'LP-Series', hsn: '6403', displayOrder: 105 },
-  { id: 'M3304D', name: 'M3304D', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'M-Series', hsn: '6403', displayOrder: 106 },
-  { id: 'PACKING', name: 'PACKING', stockQuantity: 14, mrp: 999, margin: '38%', price: 619.38, category: 'Service', hsn: '6403', displayOrder: 107 },
-  { id: 'SH-1111', name: 'SH-1111', stockQuantity: 11, mrp: 999, margin: '38%', price: 619.38, category: 'SH-Series', hsn: '6403', displayOrder: 108 },
-  { id: 'SH-1301', name: 'SH-1301', stockQuantity: 2, mrp: 999, margin: '38%', price: 619.38, category: 'SH-Series', hsn: '6403', displayOrder: 109 },
-  { id: 'SH-1309', name: 'SH-1309', stockQuantity: 8, mrp: 999, margin: '38%', price: 619.38, category: 'SH-Series', hsn: '6403', displayOrder: 110 },
-  { id: 'SH-1311', name: 'SH-1311', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'SH-Series', hsn: '6403', displayOrder: 111 },
-  { id: 'SH-1401', name: 'SH-1401', stockQuantity: 4, mrp: 999, margin: '38%', price: 619.38, category: 'SH-Series', hsn: '6403', displayOrder: 112 },
+  { id: '1021-Prado-Hill', name: '1021-Prado Hill', stockQuantity: 26, mrp: 999, margin: 38, price: 619.38, category: 'Prado Hill', hsn: '6403', displayOrder: 1 },
+  { id: '1032-Prado-Hill', name: '1032-Prado Hill', stockQuantity: 14, mrp: 999, margin: 38, price: 619.38, category: 'Prado Hill', hsn: '6403', displayOrder: 2 },
+  { id: '1051-Prado-Hill', name: '1051-Prado Hill', stockQuantity: 8, mrp: 999, margin: 38, price: 619.38, category: 'Prado Hill', hsn: '6403', displayOrder: 3 },
+  { id: '1082-PradoHill', name: '1082-PradoHill', stockQuantity: 20, mrp: 999, margin: 38, price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 4 },
+  { id: '1091-PradoHill', name: '1091-PradoHill', stockQuantity: 8, mrp: 999, margin: 38, price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 5 },
+  { id: '1102-PradoHill', name: '1102-PradoHill', stockQuantity: 4, mrp: 999, margin: 38, price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 6 },
+  { id: '1132-PradoHill', name: '1132-PradoHill', stockQuantity: 1, mrp: 999, margin: 38, price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 7 },
+  { id: '1141-Prado-Hill', name: '1141-Prado Hill', stockQuantity: 1, mrp: 999, margin: 38, price: 619.38, category: 'Prado Hill', hsn: '6403', displayOrder: 8 },
+  { id: '1142-PradoHill', name: '1142-PradoHill', stockQuantity: 32, mrp: 999, margin: 38, price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 9 },
+  { id: '1162-PradoHill', name: '1162-PradoHill', stockQuantity: 14, mrp: 999, margin: 38, price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 10 },
+  { id: '1192-PradoHill', name: '1192-PradoHill', stockQuantity: 29, mrp: 999, margin: 38, price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 11 },
+  { id: '1232-PradoHill', name: '1232-PradoHill', stockQuantity: 11, mrp: 999, margin: 38, price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 12 },
+  { id: '1261-PradoHill', name: '1261-PradoHill', stockQuantity: 6, mrp: 999, margin: 38, price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 13 },
+  { id: '1272-PradoHill', name: '1272-PradoHill', stockQuantity: 1, mrp: 999, margin: 38, price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 14 },
+  { id: '1321-PradoHill', name: '1321-PradoHill', stockQuantity: 49, mrp: 999, margin: 38, price: 619.38, category: 'PradoHill', hsn: '6403', displayOrder: 15 },
 ];
 
 export default function AdminPage() {
@@ -195,6 +99,7 @@ function AdminContent() {
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [productSearch, setProductSearch] = useState("");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -254,6 +159,15 @@ function AdminContent() {
     return merged.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
   }, [firestoreProducts, loadingProducts]);
 
+  const filteredProducts = useMemo(() => {
+    if (!productSearch) return mergedProducts;
+    return mergedProducts.filter(p => 
+      p.id.toLowerCase().includes(productSearch.toLowerCase()) ||
+      p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+      (p.category && p.category.toLowerCase().includes(productSearch.toLowerCase()))
+    );
+  }, [mergedProducts, productSearch]);
+
   const getRetailerName = (userId: string) => {
     const retailer = retailers?.find(r => r.id === userId || r.originalRequestId === userId);
     return retailer?.firmName || userId?.slice(0, 8) || 'Unknown';
@@ -301,14 +215,15 @@ function AdminContent() {
   const handleExportInventoryCSV = () => {
     if (!mergedProducts || mergedProducts.length === 0) return;
     
-    const headers = ["Article ID", "Name", "Category", "Current Qty", "Price (INR)", "Inventory Value (INR)"];
+    const headers = ["Article ID", "Name", "Category", "Current Qty", "MRP", "Margin %", "Wholesale Price (INR)"];
     const rows = mergedProducts.map(p => [
       p.id,
       p.name,
       p.category || "General",
       p.stockQuantity,
-      p.price.toFixed(2),
-      (p.stockQuantity * p.price).toFixed(2)
+      p.mrp,
+      p.margin || 0,
+      p.price.toFixed(2)
     ]);
 
     const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
@@ -325,8 +240,8 @@ function AdminContent() {
   };
 
   const handleDownloadTemplateCSV = () => {
-    const headers = ["article_id", "name", "category", "quantity", "price", "mrp", "hsn"];
-    const exampleRow = ["SKU-101", "Classic Oxford", "Formal", "10", "1200", "1800", "6403"];
+    const headers = ["article_id", "name", "category", "quantity", "price", "mrp", "margin", "hsn"];
+    const exampleRow = ["SKU-101", "Classic Oxford", "Formal", "10", "1200", "1800", "33.33", "6403"];
     
     const csvContent = [headers, exampleRow].map(e => e.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -367,27 +282,35 @@ function AdminContent() {
         }
 
         const qty = parseInt(rowData.quantity || rowData.stockquantity) || 0;
-        const price = parseFloat(rowData.price) || 0;
-        const mrp = parseFloat(rowData.mrp) || (price * 1.5);
+        const mrp = parseFloat(rowData.mrp) || 0;
+        const margin = parseFloat(rowData.margin) || 0;
+        let price = parseFloat(rowData.price) || 0;
+
+        // If price is 0 but MRP and margin exist, auto calculate
+        if (price === 0 && mrp > 0 && margin > 0) {
+          price = mrp * (1 - (margin / 100));
+        }
 
         try {
           const docRef = doc(db, "Products", articleId);
           const docSnap = await getDoc(docRef);
 
           if (docSnap.exists()) {
-            // Atomic increment for existing articles
             await updateDoc(docRef, {
               stockQuantity: increment(qty),
+              mrp: mrp,
+              margin: margin,
+              price: price,
               updatedAt: new Date().toISOString()
             });
           } else {
-            // Create new entry if it doesn't exist
             await setDoc(docRef, {
               id: articleId,
               name: rowData.name || articleId,
               category: rowData.category || "General",
               price: price,
               mrp: mrp,
+              margin: margin,
               hsn: rowData.hsn || "6403",
               stockQuantity: qty,
               displayOrder: mergedProducts.length + i,
@@ -535,12 +458,17 @@ function AdminContent() {
       return;
     }
 
+    const mrp = parseFloat(editingProduct.mrp) || 0;
+    const margin = parseFloat(editingProduct.margin) || 0;
+    const calculatedPrice = mrp * (1 - (margin / 100));
+
     const productRef = doc(db, "Products", editingProduct.id);
     
     setDocumentNonBlocking(productRef, {
       ...editingProduct,
-      price: parseFloat(editingProduct.price) || 0,
-      mrp: parseFloat(editingProduct.mrp) || 0,
+      price: calculatedPrice,
+      mrp: mrp,
+      margin: margin,
       hsn: editingProduct.hsn || "6403",
       stockQuantity: parseInt(editingProduct.stockQuantity) || 0,
       displayOrder: parseInt(editingProduct.displayOrder) || 0,
@@ -585,10 +513,10 @@ function AdminContent() {
       category: "",
       stockQuantity: 0,
       mrp: 0,
+      margin: 38,
       price: 0,
       hsn: "6403",
       imageUrl: "",
-      margin: "38%",
       displayOrder: mergedProducts.length + 1
     });
   };
@@ -778,7 +706,15 @@ function AdminContent() {
             <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-4 border border-primary/5 gap-4">
               <div className="flex flex-col gap-1">
                 <div className="text-[10px] font-black uppercase tracking-widest opacity-40">{mergedProducts.length} Articles</div>
-                <div className="text-[8px] font-black uppercase text-accent">Bulk Management Ready</div>
+                <div className="relative mt-2">
+                  <Search className="absolute left-3 top-3 h-3 w-3 text-primary/30" />
+                  <Input 
+                    placeholder="Search Article ID or Name..." 
+                    className="pl-9 rounded-none h-10 text-[10px] uppercase font-bold border-primary/10 w-full sm:w-64"
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                  />
+                </div>
               </div>
               <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                 <Button onClick={handleDownloadTemplateCSV} variant="outline" className="flex-1 sm:flex-none h-12 rounded-none border-primary uppercase font-black text-[9px] tracking-widest gap-2">
@@ -804,27 +740,31 @@ function AdminContent() {
                       <TableHead className="text-background uppercase font-black text-[10px]"></TableHead>
                       <TableHead className="text-background uppercase font-black text-[10px]">ID/Name</TableHead>
                       <TableHead className="text-background uppercase font-black text-[10px]">Stock</TableHead>
-                      <TableHead className="text-background uppercase font-black text-[10px]">Price</TableHead>
+                      <TableHead className="text-background uppercase font-black text-[10px]">MRP</TableHead>
+                      <TableHead className="text-background uppercase font-black text-[10px]">Margin</TableHead>
+                      <TableHead className="text-background uppercase font-black text-[10px]">W/S Price</TableHead>
                       <TableHead className="text-background uppercase font-black text-[10px] text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loadingProducts ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-20 uppercase font-black text-[10px] opacity-40">Loading...</TableCell></TableRow>
-                    ) : mergedProducts.map((p, idx) => (
+                      <TableRow><TableCell colSpan={7} className="text-center py-20 uppercase font-black text-[10px] opacity-40">Loading...</TableCell></TableRow>
+                    ) : filteredProducts.map((p, idx) => (
                       <TableRow key={p.id} className="border-primary/5">
                         <TableCell>
                           <div className="flex flex-col">
                             <Button variant="ghost" size="icon" className="h-6 w-6" disabled={idx === 0} onClick={() => handleMoveProduct(p, 'up')}><ArrowUp className="h-3 w-3" /></Button>
-                            <Button variant="ghost" size="icon" className="h-6 w-6" disabled={idx === mergedProducts.length - 1} onClick={() => handleMoveProduct(p, 'down')}><ArrowDown className="h-3 w-3" /></Button>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" disabled={idx === filteredProducts.length - 1} onClick={() => handleMoveProduct(p, 'down')}><ArrowDown className="h-3 w-3" /></Button>
                           </div>
                         </TableCell>
                         <TableCell className="font-bold text-[10px] uppercase">
-                          <div className="font-black text-accent truncate max-w-[80px]">{p.id}</div>
-                          <div className="opacity-60 truncate max-w-[80px]">{p.name}</div>
+                          <div className="font-black text-accent truncate max-w-[120px]">{p.id}</div>
+                          <div className="opacity-60 truncate max-w-[120px]">{p.name}</div>
                         </TableCell>
                         <TableCell className="font-mono text-[10px]">{p.stockQuantity}</TableCell>
-                        <TableCell className="font-black text-[10px]">₹{p.price}</TableCell>
+                        <TableCell className="font-black text-[10px]">₹{p.mrp}</TableCell>
+                        <TableCell className="font-black text-[10px] text-accent">{p.margin || 0}%</TableCell>
+                        <TableCell className="font-black text-[10px]">₹{p.price?.toFixed(2)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
                             <Button variant="ghost" size="sm" onClick={() => setEditingProduct(p)} className="p-1"><Edit className="h-3 w-3" /></Button>
@@ -987,14 +927,39 @@ function AdminContent() {
                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => handleImageFileChange(e, 'product')} />
               </div>
             </div>
-            <Input placeholder="SKU ID" value={editingProduct?.id ?? ""} onChange={(e) => setEditingProduct({...editingProduct, id: e.target.value})} className="rounded-none text-[10px]" />
-            <Input placeholder="Name" value={editingProduct?.name ?? ""} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="rounded-none text-[10px]" />
-            <Input placeholder="HSN (e.g. 6403)" value={editingProduct?.hsn ?? "6403"} onChange={(e) => setEditingProduct({...editingProduct, hsn: e.target.value})} className="rounded-none text-[10px]" />
-            <div className="grid grid-cols-2 gap-4">
-              <Input type="number" placeholder="Stock" value={editingProduct?.stockQuantity ?? 0} onChange={(e) => setEditingProduct({...editingProduct, stockQuantity: e.target.value})} className="rounded-none text-[10px]" />
-              <Input type="number" placeholder="Price" value={editingProduct?.price ?? 0} onChange={(e) => setEditingProduct({...editingProduct, price: e.target.value})} className="rounded-none text-[10px]" />
+            <div className="space-y-1">
+              <Label className="text-[9px] font-black uppercase">SKU ID</Label>
+              <Input placeholder="SKU ID" value={editingProduct?.id ?? ""} onChange={(e) => setEditingProduct({...editingProduct, id: e.target.value})} className="rounded-none text-[10px]" />
             </div>
-            <Button onClick={handleSaveProduct} className="w-full h-12 uppercase font-black text-[10px]">Save Article</Button>
+            <div className="space-y-1">
+              <Label className="text-[9px] font-black uppercase">Product Name</Label>
+              <Input placeholder="Name" value={editingProduct?.name ?? ""} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="rounded-none text-[10px]" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-[9px] font-black uppercase">HSN</Label>
+                <Input placeholder="HSN (e.g. 6403)" value={editingProduct?.hsn ?? "6403"} onChange={(e) => setEditingProduct({...editingProduct, hsn: e.target.value})} className="rounded-none text-[10px]" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[9px] font-black uppercase">Stock Qty</Label>
+                <Input type="number" placeholder="Stock" value={editingProduct?.stockQuantity ?? 0} onChange={(e) => setEditingProduct({...editingProduct, stockQuantity: e.target.value})} className="rounded-none text-[10px]" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-primary/5">
+              <div className="space-y-1">
+                <Label className="text-[9px] font-black uppercase">MRP (Retail)</Label>
+                <Input type="number" placeholder="MRP" value={editingProduct?.mrp ?? 0} onChange={(e) => setEditingProduct({...editingProduct, mrp: e.target.value})} className="rounded-none text-[10px] font-bold" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[9px] font-black uppercase">Margin (%)</Label>
+                <Input type="number" placeholder="Margin" value={editingProduct?.margin ?? 38} onChange={(e) => setEditingProduct({...editingProduct, margin: e.target.value})} className="rounded-none text-[10px] font-bold text-accent" />
+              </div>
+            </div>
+            <div className="bg-primary/5 p-4 flex justify-between items-center">
+              <span className="text-[9px] font-black uppercase opacity-40">Calculated W/S Price</span>
+              <span className="text-lg font-black">₹{((parseFloat(editingProduct?.mrp) || 0) * (1 - (parseFloat(editingProduct?.margin) || 0) / 100)).toFixed(2)}</span>
+            </div>
+            <Button onClick={handleSaveProduct} className="w-full h-12 bg-primary text-background rounded-none uppercase font-black text-[10px] tracking-widest">Save Article Registry</Button>
           </div>
         </DialogContent>
       </Dialog>

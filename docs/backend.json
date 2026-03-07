@@ -59,6 +59,7 @@
         "imageUrl": { "type": "string", "description": "URL of the product image." },
         "price": { "type": "number" },
         "mrp": { "type": "number" },
+        "margin": { "type": "number", "description": "Percentage discount from MRP to get wholesale price." },
         "stockQuantity": { "type": "number" },
         "categoryId": { "type": "string" },
         "hsn": { "type": "string", "default": "6403" },
