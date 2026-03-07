@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -16,7 +17,8 @@ import {
   AlertTriangle,
   Phone as PhoneIcon,
   Fingerprint,
-  MapPin
+  MapPin,
+  UserPlus
 } from "lucide-react";
 import { useFirestore, useCollection, useMemoFirebase, useUser, useAuth } from "@/firebase";
 import { collection, query, orderBy, doc, where, getDocs } from "firebase/firestore";
@@ -74,6 +76,14 @@ function Admin1Content() {
   const [editingRequest, setEditingRequest] = useState<any>(null);
   const [editingPayment, setEditingPayment] = useState<any>(null);
   const [deleteRequestId, setDeleteRequestId] = useState<string | null>(null);
+  const [isAddingRetailer, setIsAddingRetailer] = useState(false);
+  const [newRetailer, setNewRetailer] = useState({
+    firmName: "",
+    phone: "+91",
+    gst: "",
+    openingBalance: "0",
+    creditLimit: "0"
+  });
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -112,7 +122,7 @@ function Admin1Content() {
   }, [retailers]);
 
   const getStateFromGST = (gst: string) => {
-    if (!gst || gst.length < 2) return "Unknown";
+    if (!gst || gst.length < 2) return "N/A";
     const code = gst.substring(0, 2);
     return GST_STATE_CODES[code] || "Other";
   };
@@ -141,7 +151,7 @@ function Admin1Content() {
       id: req.id,
       firmName: req.firmName,
       phone: req.phone,
-      gst: req.gst,
+      gst: req.gst || "",
       accessCode: accessCode,
       openingBalance: parseFloat(req.openingBalance) || 0,
       creditLimit: parseFloat(req.creditLimit) || 0,
@@ -165,6 +175,7 @@ function Admin1Content() {
       ...editingRequest,
       openingBalance: openingBal,
       creditLimit: creditLim,
+      gst: editingRequest.gst || "",
       updatedAt: new Date().toISOString()
     };
 
@@ -179,7 +190,7 @@ function Admin1Content() {
           creditLimit: creditLim,
           firmName: editingRequest.firmName,
           phone: editingRequest.phone,
-          gst: editingRequest.gst
+          gst: editingRequest.gst || ""
         });
       });
     };
@@ -187,6 +198,32 @@ function Admin1Content() {
 
     setEditingRequest(null);
     toast({ title: "Profile Updated" });
+  };
+
+  const handleAddRetailer = () => {
+    if (!newRetailer.firmName || !newRetailer.phone) {
+      toast({ variant: "destructive", title: "Missing Fields", description: "Firm Name and Phone are mandatory." });
+      return;
+    }
+
+    const requestId = crypto.randomUUID();
+    const reqRef = doc(db, "PendingRequests", requestId);
+    
+    const requestData = {
+      id: requestId,
+      firmName: newRetailer.firmName,
+      phone: newRetailer.phone,
+      gst: newRetailer.gst || "",
+      openingBalance: parseFloat(newRetailer.openingBalance) || 0,
+      creditLimit: parseFloat(newRetailer.creditLimit) || 0,
+      status: "Pending",
+      createdAt: new Date().toISOString()
+    };
+
+    setDocumentNonBlocking(reqRef, requestData, { merge: true });
+    setIsAddingRetailer(false);
+    setNewRetailer({ firmName: "", phone: "+91", gst: "", openingBalance: "0", creditLimit: "0" });
+    toast({ title: "Retailer Added to Registry", description: "You can now approve this firm to generate an access code." });
   };
 
   const handleConfirmDelete = () => {
@@ -327,9 +364,14 @@ function Admin1Content() {
             <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter mb-2">Registry</h1>
             <p className="text-accent font-black uppercase tracking-[0.2em] md:tracking-[0.4em] text-[10px]">Financial Audit Control</p>
           </div>
-          <Button variant="ghost" onClick={handleAdminLogout} className="h-10 px-6 border border-destructive/20 text-destructive rounded-none uppercase font-black text-[9px] tracking-widest">
-            <ShieldAlert className="h-4 w-4 mr-2" /> Logout
-          </Button>
+          <div className="flex gap-2 w-full md:w-auto">
+            <Button onClick={() => setIsAddingRetailer(true)} className="flex-1 md:flex-none h-10 px-6 bg-accent text-white rounded-none uppercase font-black text-[9px] tracking-widest gap-2">
+              <UserPlus className="h-4 w-4" /> New Retailer
+            </Button>
+            <Button variant="ghost" onClick={handleAdminLogout} className="h-10 px-6 border border-destructive/20 text-destructive rounded-none uppercase font-black text-[9px] tracking-widest">
+              <ShieldAlert className="h-4 w-4 mr-2" /> Logout
+            </Button>
+          </div>
         </header>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
@@ -376,7 +418,7 @@ function Admin1Content() {
                           <TableCell className="font-black text-[10px] uppercase truncate max-w-[120px]">{req.firmName}</TableCell>
                           <TableCell>
                             <div className="flex flex-col gap-0.5">
-                              <span className="font-mono text-[9px] uppercase text-accent font-bold tracking-tight">{req.gst}</span>
+                              <span className="font-mono text-[9px] uppercase text-accent font-bold tracking-tight">{req.gst || "---"}</span>
                               <span className="text-[8px] opacity-40 font-black flex items-center gap-1 uppercase">
                                 <MapPin className="h-2 w-2" /> {stateName}
                               </span>
@@ -465,10 +507,49 @@ function Admin1Content() {
         </Tabs>
       </main>
 
+      <Dialog open={isAddingRetailer} onOpenChange={setIsAddingRetailer}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md rounded-none bg-background p-6">
+          <DialogHeader className="mb-4"><DialogTitle className="text-2xl font-black uppercase">Manual Addition</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label className="text-[9px] font-black uppercase">Firm Name *</Label>
+              <Input value={newRetailer.firmName} onChange={(e) => setNewRetailer({...newRetailer, firmName: e.target.value})} className="rounded-none h-10 font-bold" placeholder="RETAILER NAME" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[9px] font-black uppercase">Phone *</Label>
+              <Input value={newRetailer.phone} onChange={(e) => setNewRetailer({...newRetailer, phone: e.target.value})} className="rounded-none h-10 font-bold" placeholder="+91 00000 00000" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[9px] font-black uppercase">GST (Optional)</Label>
+              <Input value={newRetailer.gst} onChange={(e) => setNewRetailer({...newRetailer, gst: e.target.value.toUpperCase()})} className="rounded-none h-10 font-bold uppercase" placeholder="GST IDENTIFIER" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-[9px] font-black uppercase">Opening Bal.</Label>
+                <Input type="number" value={newRetailer.openingBalance} onChange={(e) => setNewRetailer({...newRetailer, openingBalance: e.target.value})} className="rounded-none h-10 font-bold" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[9px] font-black uppercase">Limit (INR)</Label>
+                <Input type="number" value={newRetailer.creditLimit} onChange={(e) => setNewRetailer({...newRetailer, creditLimit: e.target.value})} className="rounded-none h-10 font-bold" />
+              </div>
+            </div>
+            <Button onClick={handleAddRetailer} className="w-full h-12 bg-primary text-background rounded-none uppercase font-black text-[10px] mt-2">Initialize Retailer</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!editingRequest} onOpenChange={() => setEditingRequest(null)}>
         <DialogContent className="max-w-[95vw] sm:max-w-md rounded-none bg-background p-6">
           <DialogHeader className="mb-4"><DialogTitle className="text-2xl font-black uppercase">Registry Edit</DialogTitle></DialogHeader>
           <div className="space-y-6">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase">Firm Name</Label>
+              <Input value={editingRequest?.firmName ?? ""} onChange={(e) => setEditingRequest({...editingRequest, firmName: e.target.value})} className="rounded-none h-12 font-black" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase">GST Identifier</Label>
+              <Input value={editingRequest?.gst ?? ""} onChange={(e) => setEditingRequest({...editingRequest, gst: e.target.value.toUpperCase()})} className="rounded-none h-12 font-black uppercase" />
+            </div>
             <div className="space-y-2"><Label className="text-[10px] font-black uppercase">Opening Balance (INR)</Label><Input type="number" value={editingRequest?.openingBalance ?? 0} onChange={(e) => setEditingRequest({...editingRequest, openingBalance: e.target.value})} className="rounded-none h-12 font-black" /></div>
             <div className="space-y-2"><Label className="text-[10px] font-black uppercase">Credit Limit (INR)</Label><Input type="number" value={editingRequest?.creditLimit ?? 0} onChange={(e) => setEditingRequest({...editingRequest, creditLimit: e.target.value})} className="rounded-none h-12 font-black" /></div>
             <Button onClick={handleSaveEdit} className="w-full h-14 bg-primary text-background rounded-none uppercase font-black text-[10px]">Sync Registry</Button>

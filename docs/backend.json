@@ -16,7 +16,7 @@
         "creditLimit": { "type": "number" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["firmName", "gst", "phone", "status"]
+      "required": ["firmName", "phone", "status"]
     },
     "AuthorizedUser": {
       "title": "AuthorizedUser",
