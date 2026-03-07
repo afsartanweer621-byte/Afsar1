@@ -186,8 +186,17 @@ function AdminContent() {
   };
 
   const handleCancelOrder = (order: any) => {
-    const orderRef = doc(db, "Orders", order.id);
     const wasApproved = order.status === "Approved";
+    
+    // Safety check for approved orders
+    if (wasApproved) {
+      const confirmed = window.confirm(
+        "WARNING: This order is already APPROVED. Rejecting it will automatically REVERSE the stock quantity and return items to active inventory. This will also remove the entry from the retailer's outstanding balance. Proceed?"
+      );
+      if (!confirmed) return;
+    }
+
+    const orderRef = doc(db, "Orders", order.id);
     
     // 1. Update Status
     updateDocumentNonBlocking(orderRef, {
@@ -415,7 +424,7 @@ function AdminContent() {
                       <TableHead className="text-background uppercase font-black text-[10px]">Items</TableHead>
                       <TableHead className="text-background uppercase font-black text-[10px]">Total</TableHead>
                       <TableHead className="text-background uppercase font-black text-[10px]">Status</TableHead>
-                      <TableHead className="text-background uppercase font-black text-[10px] text-right">Action</TableHead>
+                      <TableHead className="text-background uppercase font-black text-[10px] text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
