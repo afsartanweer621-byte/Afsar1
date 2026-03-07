@@ -28,7 +28,10 @@ import {
   Search,
   Eraser,
   Send,
-  X
+  X,
+  CheckCircle2,
+  Clock,
+  ExternalLink
 } from "lucide-react";
 import { useFirestore, useCollection, useMemoFirebase, useUser, useAuth } from "@/firebase";
 import { collection, doc, query, orderBy, getDoc, setDoc, updateDoc, increment } from "firebase/firestore";
@@ -51,6 +54,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AdminAuthGuard } from "@/components/auth/AdminAuthGuard";
 import { FALLBACK_PRODUCTS } from "@/lib/fallback-products";
+import { cn } from "@/lib/utils";
 
 export default function AdminPage() {
   return (
@@ -94,7 +98,7 @@ function AdminContent() {
   [db, user]);
   
   const ordersQuery = useMemoFirebase(() => 
-    user ? collection(db, "Orders") : null, 
+    user ? query(collection(db, "Orders"), orderBy("createdAt", "desc")) : null, 
   [db, user]);
 
   const retailersQuery = useMemoFirebase(() => 
@@ -105,15 +109,10 @@ function AdminContent() {
     user ? query(collection(db, "Notifications"), orderBy("createdAt", "desc")) : null, 
   [db, user]);
 
-  const carouselQuery = useMemoFirebase(() => 
-    user ? query(collection(db, "app_assets", "homepage", "carousel"), orderBy("order", "asc")) : null,
-  [db, user]);
-
   const { data: firestoreProducts, isLoading: loadingProducts } = useCollection(productsQuery);
   const { data: rawOrders, isLoading: loadingOrders } = useCollection(ordersQuery);
   const { data: retailers } = useCollection(retailersQuery);
   const { data: notifications } = useCollection(notificationsQuery);
-  const { data: slides } = useCollection(carouselQuery);
 
   const mergedProducts = useMemo(() => {
     if (loadingProducts) return [];
@@ -152,13 +151,6 @@ function AdminContent() {
     return retailer?.firmName || userId?.slice(0, 8) || 'Unknown';
   };
 
-  const orders = useMemo(() => {
-    if (!rawOrders) return [];
-    return [...rawOrders].sort((a, b) => 
-      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    );
-  }, [rawOrders]);
-
   const handleAdminLogout = async () => {
     sessionStorage.removeItem("admin_terminal_authorized");
     await signOut(auth);
@@ -166,159 +158,22 @@ function AdminContent() {
     window.location.reload();
   };
 
-  const handleDownloadOrdersCSV = () => {
-    if (!orders || orders.length === 0) return;
-    
-    const headers = ["Order ID", "Firm Name", "Date", "Status", "Total Amount (INR)"];
-    const rows = orders.map(order => [
-      order.id,
-      getRetailerName(order.userId),
-      new Date(order.createdAt).toLocaleDateString(),
-      order.status,
-      (order.totalAmount || 0).toFixed(2)
-    ]);
-
-    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `Admin_Orders_Export_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    
-    toast({
-      title: "CSV Export Complete",
-      description: "The order registry has been downloaded.",
+  const handleApproveOrder = (order: any) => {
+    const orderRef = doc(db, "Orders", order.id);
+    updateDocumentNonBlocking(orderRef, {
+      status: "Approved",
+      updatedAt: new Date().toISOString()
     });
+    toast({ title: "Order Approved", description: `Order #${order.id.slice(0,8)} is now confirmed.` });
   };
 
-  const handleExportInventoryCSV = () => {
-    if (!mergedProducts || mergedProducts.length === 0) return;
-    
-    const headers = ["article_id", "name", "category", "quantity", "mrp", "margin", "price", "hsn"];
-    const rows = mergedProducts.map(p => [
-      p.id,
-      p.name,
-      p.category || "General",
-      p.stockQuantity,
-      p.mrp,
-      p.margin || 0,
-      p.price.toFixed(2),
-      p.hsn || "6403"
-    ]);
-
-    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `Inventory_Export_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    
-    toast({
-      title: "Inventory Export Complete",
-      description: "Current article registry and valuations downloaded.",
+  const handleRejectOrder = (order: any) => {
+    const orderRef = doc(db, "Orders", order.id);
+    updateDocumentNonBlocking(orderRef, {
+      status: "Cancelled",
+      updatedAt: new Date().toISOString()
     });
-  };
-
-  const handleDownloadTemplateCSV = () => {
-    const headers = ["article_id", "name", "category", "quantity", "mrp", "margin", "price", "hsn"];
-    const exampleRow = ["SKU-101", "Classic Oxford", "Formal", "10", "1800", "38", "1116", "6403"];
-    
-    const csvContent = [headers, exampleRow].map(e => e.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `Inventory_Bulk_Upload_Template.csv`;
-    link.click();
-    
-    toast({
-      title: "Template Downloaded",
-      description: "Follow this format for successful bulk inventory updates.",
-    });
-  };
-
-  const handleBulkUploadCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsBulkProcessing(true);
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const text = event.target?.result as string;
-      const lines = text.split('\n').filter(l => l.trim() !== '');
-      if (lines.length < 2) {
-        setIsBulkProcessing(false);
-        toast({ variant: "destructive", title: "Invalid File", description: "CSV is empty or missing data." });
-        return;
-      }
-
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-      
-      let successCount = 0;
-      let errorCount = 0;
-
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim());
-        const rowData: any = {};
-        headers.forEach((h, idx) => { rowData[h] = values[idx]; });
-
-        const articleId = rowData.article_id || rowData.id;
-        if (!articleId) {
-          errorCount++;
-          continue;
-        }
-
-        const qty = parseInt(rowData.quantity || rowData.stockquantity || "0") || 0;
-        const mrp = parseFloat(rowData.mrp) || 0;
-        const margin = parseFloat(rowData.margin) || 0;
-        let price = parseFloat(rowData.price) || 0;
-
-        if ((price === 0 || isNaN(price)) && mrp > 0) {
-          price = mrp * (1 - (margin / 100));
-        }
-
-        try {
-          const docRef = doc(db, "Products", articleId);
-          const docSnap = await getDoc(docRef);
-
-          const payload = {
-            id: articleId,
-            name: rowData.name || articleId,
-            category: rowData.category || "General",
-            price: price,
-            mrp: mrp,
-            margin: margin,
-            hsn: rowData.hsn || "6403",
-            stockQuantity: qty,
-            deleted: false,
-            updatedAt: new Date().toISOString()
-          };
-
-          if (docSnap.exists()) {
-            await updateDoc(docRef, {
-              ...payload,
-              stockQuantity: increment(qty) 
-            });
-          } else {
-            await setDoc(docRef, {
-              ...payload,
-              displayOrder: mergedProducts.length + i
-            });
-          }
-          successCount++;
-        } catch (error) {
-          console.error(`Error processing ${articleId}:`, error);
-          errorCount++;
-        }
-      }
-
-      setIsBulkProcessing(false);
-      toast({
-        title: "Bulk Upload Finished",
-        description: `Processed ${successCount} articles. Errors: ${errorCount}. Registry updated.`,
-      });
-      if (bulkUploadRef.current) bulkUploadRef.current.value = "";
-    };
-    reader.readAsText(file);
+    toast({ title: "Order Cancelled", description: `Order #${order.id.slice(0,8)} has been rejected.` });
   };
 
   const handleSendNotification = () => {
@@ -349,31 +204,20 @@ function AdminContent() {
 
   const handleSaveProduct = () => {
     if (!editingProduct) return;
-    if (!editingProduct.id) {
-      toast({ variant: "destructive", title: "Missing ID" });
-      return;
-    }
-
     const mrp = parseFloat(editingProduct.mrp) || 0;
     const margin = parseFloat(editingProduct.margin) || 0;
     const calculatedPrice = mrp * (1 - (margin / 100));
 
     const productRef = doc(db, "Products", editingProduct.id);
-    
     const payload = {
       ...editingProduct,
       price: calculatedPrice,
       mrp: mrp,
       margin: margin,
-      hsn: editingProduct.hsn || "6403",
-      stockQuantity: parseInt(editingProduct.stockQuantity) || 0,
-      displayOrder: parseInt(editingProduct.displayOrder) || 0,
-      deleted: false,
       updatedAt: new Date().toISOString()
     };
 
     setDocumentNonBlocking(productRef, payload, { merge: true });
-    
     setEditingProduct(null);
     toast({ title: "Inventory Updated" });
   };
@@ -400,11 +244,14 @@ function AdminContent() {
 
     setIsUploading(true);
     try {
-      const resizedImage = await resizeImage(file, 600);
-      const newUrls = [...(editingProduct.imageUrls || ["", "", ""])];
-      newUrls[index] = resizedImage;
-      setEditingProduct({ ...editingProduct, imageUrls: newUrls });
-      toast({ title: "Image Prepared" });
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const newUrls = [...(editingProduct.imageUrls || ["", "", ""])];
+        newUrls[index] = event.target?.result as string;
+        setEditingProduct({ ...editingProduct, imageUrls: newUrls });
+        toast({ title: "Image Prepared" });
+      };
+      reader.readAsDataURL(file);
     } catch (error) {
       toast({ variant: "destructive", title: "Upload Failed" });
     } finally {
@@ -418,35 +265,51 @@ function AdminContent() {
     setEditingProduct({ ...editingProduct, imageUrls: newUrls });
   };
 
-  const resizeImage = (file: File, maxWidth: number): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new (window as any).Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const scaleSize = maxWidth / img.width;
-          canvas.width = maxWidth;
-          canvas.height = img.height * scaleSize;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL('image/jpeg', 0.7));
-        };
-        img.src = event.target?.result;
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
+  const handleBulkUploadCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  const handlePurgeAll = () => setIsPurgingAll(true);
-  const handleConfirmPurgeAll = () => {
-    mergedProducts.forEach(p => {
-      const productRef = doc(db, "Products", p.id);
-      setDocumentNonBlocking(productRef, { deleted: true, updatedAt: new Date().toISOString() }, { merge: true });
-    });
-    setIsPurgingAll(false);
-    toast({ variant: "destructive", title: "Registry Purged" });
+    setIsBulkProcessing(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      const lines = text.split('\n').filter(l => l.trim() !== '');
+      if (lines.length < 2) {
+        setIsBulkProcessing(false);
+        toast({ variant: "destructive", title: "Invalid File" });
+        return;
+      }
+
+      let count = 0;
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim());
+        const [id, name, category, qty, mrp, margin] = values;
+        if (!id) continue;
+
+        const productRef = doc(db, "Products", id);
+        const mrpValue = parseFloat(mrp) || 0;
+        const marginValue = parseFloat(margin) || 38;
+        
+        await setDoc(productRef, {
+          id,
+          name: name || id,
+          category: category || "General",
+          stockQuantity: parseInt(qty) || 0,
+          mrp: mrpValue,
+          margin: marginValue,
+          price: mrpValue * (1 - (marginValue / 100)),
+          hsn: "6403",
+          deleted: false,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+        count++;
+      }
+
+      setIsBulkProcessing(false);
+      toast({ title: "Bulk Upload Finished", description: `Updated ${count} articles.` });
+      if (bulkUploadRef.current) bulkUploadRef.current.value = "";
+    };
+    reader.readAsText(file);
   };
 
   if (!mounted || isUserLoading) {
@@ -475,29 +338,75 @@ function AdminContent() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
           <TabsList className="bg-primary p-1 rounded-none h-14 w-full flex overflow-x-auto gap-1 no-scrollbar">
-            <TabsTrigger value="orders" className="flex-1 md:flex-none rounded-none px-6 h-full data-[state=active]:bg-accent uppercase font-black text-[9px] tracking-widest">Orders</TabsTrigger>
-            <TabsTrigger value="products" className="flex-1 md:flex-none rounded-none px-6 h-full data-[state=active]:bg-accent uppercase font-black text-[9px] tracking-widest">Inventory</TabsTrigger>
-            <TabsTrigger value="notifications" className="flex-1 md:flex-none rounded-none px-6 h-full data-[state=active]:bg-accent uppercase font-black text-[9px] tracking-widest">Alerts</TabsTrigger>
+            <TabsTrigger value="orders" className="flex-1 md:flex-none rounded-none px-6 h-full data-[state=active]:bg-accent uppercase font-black text-[10px] tracking-widest">Orders</TabsTrigger>
+            <TabsTrigger value="products" className="flex-1 md:flex-none rounded-none px-6 h-full data-[state=active]:bg-accent uppercase font-black text-[10px] tracking-widest">Inventory</TabsTrigger>
+            <TabsTrigger value="notifications" className="flex-1 md:flex-none rounded-none px-6 h-full data-[state=active]:bg-accent uppercase font-black text-[10px] tracking-widest">Alerts</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="orders" className="space-y-6">
+            <Card className="border-none shadow-xl rounded-none overflow-hidden bg-white">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-primary">
+                    <TableRow className="border-none">
+                      <TableHead className="text-background uppercase font-black text-[10px]">Date</TableHead>
+                      <TableHead className="text-background uppercase font-black text-[10px]">Firm Name</TableHead>
+                      <TableHead className="text-background uppercase font-black text-[10px]">Items</TableHead>
+                      <TableHead className="text-background uppercase font-black text-[10px]">Total</TableHead>
+                      <TableHead className="text-background uppercase font-black text-[10px]">Status</TableHead>
+                      <TableHead className="text-background uppercase font-black text-[10px] text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loadingOrders ? (
+                      <TableRow><TableCell colSpan={6} className="text-center py-20 animate-pulse uppercase font-black text-[10px]">Fetching Orders...</TableCell></TableRow>
+                    ) : rawOrders?.length === 0 ? (
+                      <TableRow><TableCell colSpan={6} className="text-center py-20 uppercase font-black text-[10px] opacity-20">No Orders in Registry</TableCell></TableRow>
+                    ) : rawOrders?.map((order) => (
+                      <TableRow key={order.id} className="border-primary/5">
+                        <TableCell className="font-bold text-[10px]">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
+                        <TableCell className="font-black text-[10px] uppercase text-accent">{getRetailerName(order.userId)}</TableCell>
+                        <TableCell className="text-[10px] font-bold">{order.items?.length || 0} SKU</TableCell>
+                        <TableCell className="font-black text-[10px]">₹{order.totalAmount?.toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Badge className={cn("rounded-none text-[8px] font-black uppercase", 
+                            order.status === 'Approved' ? "bg-green-100 text-green-700" : 
+                            order.status === 'Cancelled' ? "bg-red-100 text-red-700" : 
+                            "bg-amber-100 text-amber-700")}>
+                            {order.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            {order.status === 'Processing' && (
+                              <>
+                                <Button size="sm" onClick={() => handleApproveOrder(order)} className="h-8 bg-green-600 text-white rounded-none uppercase font-black text-[8px] px-3">Approve</Button>
+                                <Button size="sm" onClick={() => handleRejectOrder(order)} variant="destructive" className="h-8 rounded-none uppercase font-black text-[8px] px-3">Reject</Button>
+                              </>
+                            )}
+                            <Button variant="ghost" size="sm" onClick={() => setEditingOrder(order)} className="p-1"><ExternalLink className="h-3 w-3" /></Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="products" className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-4 border border-primary/5 gap-4">
-              <div className="flex flex-col gap-1">
-                <div className="text-[10px] font-black uppercase tracking-widest opacity-40">{mergedProducts.length} Articles</div>
-                <div className="relative mt-2">
-                  <Search className="absolute left-3 top-3 h-3 w-3 text-primary/30" />
-                  <Input placeholder="Search..." className="pl-9 rounded-none h-10 text-[10px] uppercase font-bold border-primary/10 w-full sm:w-64" value={productSearch} onChange={(e) => setProductSearch(e.target.value)} />
-                </div>
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-3 h-3 w-3 text-primary/30" />
+                <Input placeholder="SEARCH ARTICLE..." className="pl-9 rounded-none h-10 text-[10px] uppercase font-bold" value={productSearch} onChange={(e) => setProductSearch(e.target.value)} />
               </div>
               <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-                <Button onClick={handlePurgeAll} variant="outline" className="flex-1 sm:flex-none h-12 rounded-none border-destructive text-destructive font-black text-[9px] uppercase tracking-widest gap-2">
-                  <Eraser className="h-4 w-4" /> Purge All
-                </Button>
-                <Button onClick={() => bulkUploadRef.current?.click()} variant="outline" className="flex-1 sm:flex-none h-12 rounded-none border-primary font-black text-[9px] uppercase tracking-widest gap-2">
+                <Button onClick={() => bulkUploadRef.current?.click()} variant="outline" className="flex-1 sm:flex-none h-10 rounded-none border-primary font-black text-[9px] uppercase tracking-widest gap-2">
                   <FileUp className="h-4 w-4" /> Bulk Upload
                 </Button>
                 <input type="file" ref={bulkUploadRef} className="hidden" accept=".csv" onChange={handleBulkUploadCSV} />
-                <Button onClick={handleAddNewProduct} className="flex-1 sm:flex-none bg-primary text-background h-12 rounded-none uppercase font-black text-[9px] tracking-widest gap-2">
+                <Button onClick={handleAddNewProduct} className="flex-1 sm:flex-none bg-primary text-background h-10 rounded-none uppercase font-black text-[9px] tracking-widest gap-2">
                   <Plus className="h-4 w-4" /> New Article
                 </Button>
               </div>
@@ -520,12 +429,12 @@ function AdminContent() {
                       <TableRow key={p.id} className="border-primary/5">
                         <TableCell>
                           <div className="relative h-8 w-8 bg-primary/5">
-                            {p.imageUrls?.[0] && <Image src={p.imageUrls[0]} alt="" fill className="object-cover" />}
+                            {(p.imageUrls?.[0] || p.imageUrl) && <Image src={p.imageUrls?.[0] || p.imageUrl} alt="" fill className="object-cover" />}
                           </div>
                         </TableCell>
                         <TableCell className="font-bold text-[10px] uppercase">
-                          <div className="font-black text-accent truncate max-w-[120px]">{p.id}</div>
-                          <div className="opacity-60 truncate max-w-[120px]">{p.name}</div>
+                          <div className="font-black text-accent">{p.id}</div>
+                          <div className="opacity-60 truncate max-w-[150px]">{p.name}</div>
                         </TableCell>
                         <TableCell className="font-mono text-[10px]">{p.stockQuantity}</TableCell>
                         <TableCell className="font-black text-[10px]">₹{p.price?.toFixed(2)}</TableCell>
@@ -542,12 +451,68 @@ function AdminContent() {
               </div>
             </Card>
           </TabsContent>
-          
-          {/* Other Tabs Content Omitted for brevity, assuming standard table view for orders/notifs */}
+
+          <TabsContent value="notifications" className="space-y-8">
+            <Card className="rounded-none border-none shadow-xl p-8 bg-white">
+              <CardHeader className="p-0 mb-6">
+                <CardTitle className="text-xl font-black uppercase">Broadcast Console</CardTitle>
+              </CardHeader>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase">Alert Title</Label>
+                    <Input value={notifTitle} onChange={(e) => setNotifTitle(e.target.value)} className="rounded-none h-12 text-[11px] font-bold" placeholder="E.G. NEW ARRIVAL: PRADO HILL" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase">Alert Type</Label>
+                    <Select value={notifType} onValueChange={setNotifType}>
+                      <SelectTrigger className="rounded-none h-12 text-[11px] font-bold">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Update">Update</SelectItem>
+                        <SelectItem value="Alert">Alert</SelectItem>
+                        <SelectItem value="Promotion">Promotion</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase">Message</Label>
+                    <Textarea value={notifMessage} onChange={(e) => setNotifMessage(e.target.value)} className="rounded-none min-h-[120px] text-[11px] font-medium" placeholder="BROADCAST CONTENT..." />
+                  </div>
+                  <Button onClick={handleSendNotification} className="w-full h-14 bg-primary text-background rounded-none uppercase font-black text-[11px] tracking-widest gap-2">
+                    <Send className="h-4 w-4" /> Send Broadcast
+                  </Button>
+                </div>
+
+                <div className="space-y-4 border-l border-primary/5 pl-8">
+                  <Label className="text-[10px] font-black uppercase opacity-40">Sent History</Label>
+                  <ScrollArea className="h-[400px]">
+                    <div className="space-y-3">
+                      {notifications?.map((n) => (
+                        <div key={n.id} className="p-4 bg-primary/5 border border-primary/5 flex justify-between items-start gap-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <Badge className="rounded-none text-[7px] uppercase font-black">{n.type}</Badge>
+                              <span className="text-[10px] font-black uppercase">{n.title}</span>
+                            </div>
+                            <p className="text-[9px] opacity-60 line-clamp-2">{n.message}</p>
+                          </div>
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteNotification(n.id)} className="h-6 w-6 text-destructive shrink-0">
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </div>
+            </Card>
+          </TabsContent>
         </Tabs>
       </main>
 
-      {/* Edit Product Dialog */}
+      {/* Product Edit Dialog */}
       <Dialog open={!!editingProduct} onOpenChange={() => setEditingProduct(null)}>
         <DialogContent className="max-w-[95vw] md:max-w-xl max-h-[90vh] overflow-y-auto rounded-none p-0 bg-background">
           <DialogHeader className="p-6 border-b border-primary/5">
@@ -555,97 +520,83 @@ function AdminContent() {
           </DialogHeader>
           <div className="p-6 space-y-6">
             <div className="space-y-3">
-              <Label className="text-[9px] font-black uppercase opacity-40">Product Media (Up to 3 images)</Label>
+              <Label className="text-[9px] font-black uppercase opacity-40">Product Media</Label>
               <div className="grid grid-cols-3 gap-4">
                 {[0, 1, 2].map((idx) => (
-                  <div key={idx} className="relative group">
-                    <div 
-                      className="aspect-square bg-primary/5 border border-dashed border-primary/20 flex items-center justify-center cursor-pointer hover:bg-primary/10 transition-all"
-                      onClick={() => fileInputRefs[idx].current?.click()}
-                    >
-                      {editingProduct?.imageUrls?.[idx] ? (
-                        <Image src={editingProduct.imageUrls[idx]} alt="" fill className="object-cover" />
-                      ) : (
-                        <div className="flex flex-col items-center gap-1 opacity-20">
-                          <Upload className="h-5 w-5" />
-                          <span className="text-[7px] font-black uppercase">Slot {idx + 1}</span>
-                        </div>
-                      )}
-                    </div>
+                  <div key={idx} className="relative group aspect-square bg-primary/5 border border-dashed border-primary/20 flex items-center justify-center cursor-pointer">
+                    {editingProduct?.imageUrls?.[idx] ? (
+                      <Image src={editingProduct.imageUrls[idx]} alt="" fill className="object-cover" />
+                    ) : (
+                      <div className="flex flex-col items-center gap-1 opacity-20" onClick={() => fileInputRefs[idx].current?.click()}>
+                        <Upload className="h-5 w-5" />
+                        <span className="text-[7px] font-black uppercase">Slot {idx + 1}</span>
+                      </div>
+                    )}
                     {editingProduct?.imageUrls?.[idx] && (
-                      <button onClick={() => removeImage(idx)} className="absolute -top-2 -right-2 bg-destructive text-white p-1 rounded-full shadow-lg">
-                        <X className="h-3 w-3" />
-                      </button>
+                      <button onClick={() => removeImage(idx)} className="absolute -top-2 -right-2 bg-destructive text-white p-1 rounded-full"><X className="h-3 w-3" /></button>
                     )}
                     <input type="file" ref={fileInputRefs[idx]} className="hidden" accept="image/*" onChange={(e) => handleImageFileChange(e, idx)} />
                   </div>
                 ))}
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label className="text-[9px] font-black uppercase">SKU ID</Label>
-                <Input value={editingProduct?.id ?? ""} onChange={(e) => setEditingProduct({...editingProduct, id: e.target.value})} className="rounded-none text-[10px]" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[9px] font-black uppercase">Name</Label>
-                <Input value={editingProduct?.name ?? ""} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="rounded-none text-[10px]" />
-              </div>
+              <Input placeholder="ID" value={editingProduct?.id} onChange={(e) => setEditingProduct({...editingProduct, id: e.target.value})} className="rounded-none" />
+              <Input placeholder="NAME" value={editingProduct?.name} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="rounded-none" />
             </div>
-
             <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <Label className="text-[9px] font-black uppercase">MRP</Label>
-                <Input type="number" value={editingProduct?.mrp ?? 0} onChange={(e) => setEditingProduct({...editingProduct, mrp: e.target.value})} className="rounded-none text-[10px]" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[9px] font-black uppercase">Margin %</Label>
-                <Input type="number" value={editingProduct?.margin ?? 38} onChange={(e) => setEditingProduct({...editingProduct, margin: e.target.value})} className="rounded-none text-[10px] text-accent" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[9px] font-black uppercase">Stock</Label>
-                <Input type="number" value={editingProduct?.stockQuantity ?? 0} onChange={(e) => setEditingProduct({...editingProduct, stockQuantity: e.target.value})} className="rounded-none text-[10px]" />
-              </div>
+              <Input type="number" placeholder="MRP" value={editingProduct?.mrp} onChange={(e) => setEditingProduct({...editingProduct, mrp: e.target.value})} className="rounded-none" />
+              <Input type="number" placeholder="MARGIN %" value={editingProduct?.margin} onChange={(e) => setEditingProduct({...editingProduct, margin: e.target.value})} className="rounded-none" />
+              <Input type="number" placeholder="STOCK" value={editingProduct?.stockQuantity} onChange={(e) => setEditingProduct({...editingProduct, stockQuantity: e.target.value})} className="rounded-none" />
             </div>
-
-            <Button onClick={handleSaveProduct} className="w-full h-14 bg-primary text-background rounded-none uppercase font-black text-[10px] tracking-widest">
-              Save Article Registry
-            </Button>
+            <Button onClick={handleSaveProduct} className="w-full h-14 bg-primary text-background rounded-none uppercase font-black text-[10px]">Save Article</Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
-        <AlertDialogContent className="rounded-none border-none">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="uppercase font-black">Confirm Deletion</AlertDialogTitle>
-            <AlertDialogDescription className="text-[10px] uppercase">Are you sure? This hides the article from the registry.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-none text-[10px] uppercase">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              const productRef = doc(db, "Products", productToDelete!);
-              setDocumentNonBlocking(productRef, { deleted: true, updatedAt: new Date().toISOString() }, { merge: true });
-              setProductToDelete(null);
-              toast({ title: "Article Deleted" });
-            }} className="rounded-none bg-destructive text-[10px] uppercase">Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={isPurgingAll} onOpenChange={setIsPurgingAll}>
-        <AlertDialogContent className="rounded-none border-none">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="uppercase font-black text-destructive">Purge Registry</AlertDialogTitle>
-            <AlertDialogDescription className="text-[10px] uppercase">This hides ALL inventory items from the app.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-none text-[10px] uppercase">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmPurgeAll} className="rounded-none bg-destructive text-[10px] uppercase">Purge All</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Order Detail Dialog */}
+      <Dialog open={!!editingOrder} onOpenChange={() => setEditingOrder(null)}>
+        <DialogContent className="max-w-[95vw] md:max-w-3xl rounded-none p-8 bg-background">
+          <DialogHeader className="mb-6">
+            <DialogTitle className="text-3xl font-black uppercase">Order Review</DialogTitle>
+            <div className="text-[10px] font-black uppercase text-accent">Order ID: #{editingOrder?.id?.slice(0,12)}</div>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div className="border border-primary/5">
+              <Table>
+                <TableHeader className="bg-primary/5">
+                  <TableRow>
+                    <TableHead className="uppercase font-black text-[10px]">Article</TableHead>
+                    <TableHead className="uppercase font-black text-[10px]">Price</TableHead>
+                    <TableHead className="uppercase font-black text-[10px]">Qty</TableHead>
+                    <TableHead className="uppercase font-black text-[10px] text-right">Subtotal</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {editingOrder?.items?.map((item: any, i: number) => (
+                    <TableRow key={i}>
+                      <TableCell className="text-[10px] font-black uppercase">{item.name}</TableCell>
+                      <TableCell className="text-[10px] font-bold">₹{item.price?.toLocaleString()}</TableCell>
+                      <TableCell className="text-[10px] font-bold">{item.quantity}</TableCell>
+                      <TableCell className="text-right text-[10px] font-black">₹{(item.price * item.quantity).toLocaleString()}</TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="bg-primary/5">
+                    <TableCell colSpan={3} className="text-right text-[10px] font-black uppercase py-4">Order Total</TableCell>
+                    <TableCell className="text-right text-xl font-black">₹{editingOrder?.totalAmount?.toLocaleString()}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+            {editingOrder?.status === 'Processing' && (
+              <div className="flex gap-4 pt-4">
+                <Button onClick={() => { handleApproveOrder(editingOrder); setEditingOrder(null); }} className="flex-1 h-14 bg-green-600 text-white rounded-none uppercase font-black text-[11px]">Approve Order</Button>
+                <Button onClick={() => { handleRejectOrder(editingOrder); setEditingOrder(null); }} variant="destructive" className="flex-1 h-14 rounded-none uppercase font-black text-[11px]">Reject Order</Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
