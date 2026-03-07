@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -18,7 +17,8 @@ import {
   Phone as PhoneIcon,
   Fingerprint,
   MapPin,
-  UserPlus
+  UserPlus,
+  Download
 } from "lucide-react";
 import { useFirestore, useCollection, useMemoFirebase, useUser, useAuth } from "@/firebase";
 import { collection, query, orderBy, doc, where, getDocs } from "firebase/firestore";
@@ -132,6 +132,71 @@ function Admin1Content() {
     await signOut(auth);
     toast({ title: "Admin Logged Out" });
     window.location.reload();
+  };
+
+  const parseAmount = (val: any): number => {
+    if (val === undefined || val === null) return 0;
+    if (typeof val === 'number') return val;
+    const cleaned = String(val).replace(/[^\d.-]/g, '');
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : num;
+  };
+
+  const calculateCurrentOS = (retailer: any) => {
+    if (!allOrders || !payments) return 0;
+    const masterId = retailer.id;
+    const approvedOrdersTotal = allOrders
+      .filter(o => (o.userId === masterId) && o.status === 'Approved')
+      .reduce((acc, curr) => acc + parseAmount(curr.totalAmount), 0);
+    const paymentsTotal = payments
+      .filter(p => p.userId === masterId && !p.deleted)
+      .reduce((acc, curr) => acc + parseAmount(curr.amount), 0);
+    
+    return approvedOrdersTotal - parseAmount(retailer.openingBalance) - paymentsTotal;
+  };
+
+  const handleDownloadRegistryCSV = () => {
+    if (!filteredRequests) return;
+
+    const headers = [
+      "Status",
+      "Firm Name",
+      "GST",
+      "State",
+      "Phone",
+      "Access Code",
+      "Credit Limit",
+      "Opening Balance",
+      "Current O/S"
+    ];
+
+    const rows = filteredRequests.map(req => {
+      const currentOS = calculateCurrentOS(req);
+      const state = getStateFromGST(req.gst || "");
+      return [
+        req.status || "Pending",
+        `"${req.firmName}"`,
+        req.gst || "---",
+        `"${state}"`,
+        req.phone,
+        req.accessCode || "---",
+        parseAmount(req.creditLimit),
+        parseAmount(req.openingBalance),
+        currentOS
+      ];
+    });
+
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `Master_Registry_Export_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+
+    toast({
+      title: "Registry Export Complete",
+      description: "The complete firm details have been downloaded.",
+    });
   };
 
   const handleApproveRequest = (req: any) => {
@@ -261,27 +326,6 @@ function Admin1Content() {
     toast({ title: "Payment Deleted" });
   };
 
-  const parseAmount = (val: any): number => {
-    if (val === undefined || val === null) return 0;
-    if (typeof val === 'number') return val;
-    const cleaned = String(val).replace(/[^\d.-]/g, '');
-    const num = parseFloat(cleaned);
-    return isNaN(num) ? 0 : num;
-  };
-
-  const calculateCurrentOS = (retailer: any) => {
-    if (!allOrders || !payments) return 0;
-    const masterId = retailer.id;
-    const approvedOrdersTotal = allOrders
-      .filter(o => (o.userId === masterId) && o.status === 'Approved')
-      .reduce((acc, curr) => acc + parseAmount(curr.totalAmount), 0);
-    const paymentsTotal = payments
-      .filter(p => p.userId === masterId && !p.deleted)
-      .reduce((acc, curr) => acc + parseAmount(curr.amount), 0);
-    
-    return approvedOrdersTotal - parseAmount(retailer.openingBalance) - paymentsTotal;
-  };
-
   const totals = useMemo(() => {
     if (!filteredRequests) return { creditLimit: 0, outstanding: 0 };
     return filteredRequests.reduce((acc, req) => {
@@ -366,7 +410,10 @@ function Admin1Content() {
             <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter mb-2">Registry</h1>
             <p className="text-accent font-black uppercase tracking-[0.2em] md:tracking-[0.4em] text-[10px]">Financial Audit Control</p>
           </div>
-          <div className="flex gap-2 w-full md:w-auto">
+          <div className="flex flex-wrap gap-2 w-full md:w-auto">
+            <Button onClick={handleDownloadRegistryCSV} variant="outline" className="flex-1 md:flex-none h-10 px-6 rounded-none uppercase font-black text-[9px] tracking-widest gap-2">
+              <Download className="h-4 w-4" /> Download CSV
+            </Button>
             <Button onClick={() => setIsAddingRetailer(true)} className="flex-1 md:flex-none h-10 px-6 bg-accent text-white rounded-none uppercase font-black text-[9px] tracking-widest gap-2">
               <UserPlus className="h-4 w-4" /> New Retailer
             </Button>
