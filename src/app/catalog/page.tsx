@@ -70,7 +70,24 @@ export default function CatalogPage() {
     }
 
     const firestoreMap = new Map(firestoreProducts.map(p => [p.id, p]));
-    const merged = base.map(p => firestoreMap.get(p.id) || p);
+    
+    // PERFORM PROPERTY-LEVEL MERGE WITH DELTA VS ABSOLUTE LOGIC
+    const merged = base.map(p => {
+      const fsProduct = firestoreMap.get(p.id);
+      if (!fsProduct) return p;
+      
+      // If fsProduct has a name, it's a manual override (absolute value)
+      if (fsProduct.name) {
+        return { ...p, ...fsProduct };
+      }
+      
+      // If fsProduct exists but has no name, it was created by atomic increments (delta)
+      return { 
+        ...p, 
+        ...fsProduct, 
+        stockQuantity: (p.stockQuantity || 0) + (fsProduct.stockQuantity || 0) 
+      };
+    });
     
     const fallbackIds = new Set(base.map(p => p.id));
     firestoreProducts.forEach(p => {

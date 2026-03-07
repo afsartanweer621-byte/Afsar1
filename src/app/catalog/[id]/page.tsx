@@ -53,8 +53,21 @@ export default function ArticleDetailPage() {
   const product = useMemo(() => {
     if (loadingProducts || !id) return null;
     const fromFirestore = firestoreProducts?.find(p => p.id === id);
-    if (fromFirestore) return fromFirestore;
-    return FALLBACK_PRODUCTS.find(p => p.id === id);
+    const fromFallback = FALLBACK_PRODUCTS.find(p => p.id === id);
+
+    if (!fromFirestore) return fromFallback;
+    if (!fromFallback) return fromFirestore;
+    
+    // Merge Logic with Delta Support
+    if (fromFirestore.name) {
+      return { ...fromFallback, ...fromFirestore };
+    }
+    
+    return {
+      ...fromFallback,
+      ...fromFirestore,
+      stockQuantity: (fromFallback.stockQuantity || 0) + (fromFirestore.stockQuantity || 0)
+    };
   }, [firestoreProducts, loadingProducts, id]);
 
   const images = useMemo(() => {

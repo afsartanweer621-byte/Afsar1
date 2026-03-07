@@ -77,9 +77,7 @@ function AdminContent() {
   const [activeTab, setActiveTab] = useState("orders");
   const [editingOrder, setEditingOrder] = useState<any>(null);
   const [editingProduct, setEditingProduct] = useState<any>(null);
-  const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
   const [productToDelete, setProductToDelete] = useState<string | null>(null);
-  const [isPurgingAll, setIsPurgingAll] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [productSearch, setProductSearch] = useState("");
@@ -122,10 +120,22 @@ function AdminContent() {
 
     const firestoreMap = new Map(firestoreProducts.map(p => [p.id, p]));
     
-    // PERFORM PROPERTY-LEVEL MERGE TO PRESERVE FALLBACK DATA (NAME, CAT)
+    // PERFORM PROPERTY-LEVEL MERGE WITH DELTA LOGIC
     const merged = base.map(p => {
       const fsProduct = firestoreMap.get(p.id);
-      return fsProduct ? { ...p, ...fsProduct } : p;
+      if (!fsProduct) return p;
+      
+      // If fsProduct has a name, it's a full manual override (absolute value)
+      if (fsProduct.name) {
+        return { ...p, ...fsProduct };
+      }
+      
+      // If fsProduct exists but has no name, it was created by an atomic increment/decrement (delta)
+      return { 
+        ...p, 
+        ...fsProduct, 
+        stockQuantity: (p.stockQuantity || 0) + (fsProduct.stockQuantity || 0) 
+      };
     });
     
     const fallbackIds = new Set(base.map(p => p.id));
@@ -182,7 +192,6 @@ function AdminContent() {
           const qtyToReduce = Math.abs(parseInt(String(item.quantity)) || 0);
           if (qtyToReduce > 0) {
             // Use setDocumentNonBlocking with merge: true for robust inventory sync
-            // This handles cases where the product doesn't exist in Firestore yet (fallback)
             setDocumentNonBlocking(productRef, {
               stockQuantity: increment(-qtyToReduce)
             }, { merge: true });
@@ -737,6 +746,32 @@ function AdminContent() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
+        <AlertDialogContent className="rounded-none border-none">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-2 text-destructive mb-2">
+              <AlertTriangle className="h-5 w-5" />
+              <AlertDialogTitle className="uppercase font-black tracking-tighter text-xl">Confirm Deletion</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-[11px] font-medium uppercase tracking-widest leading-relaxed">
+              Are you absolutely sure? This action will permanently remove this article from the Registry. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-6">
+            <AlertDialogCancel className="rounded-none uppercase font-black text-[10px] tracking-widest h-12">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (productToDelete) {
+                deleteDocumentNonBlocking(doc(db, "Products", productToDelete));
+                setProductToDelete(null);
+                toast({ title: "Article Deleted" });
+              }
+            }} className="rounded-none bg-destructive text-destructive-foreground hover:bg-destructive/90 uppercase font-black text-[10px] tracking-widest h-12">
+              Delete Article
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
