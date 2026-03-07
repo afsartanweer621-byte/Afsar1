@@ -121,17 +121,12 @@ function AdminContent() {
 
     const firestoreMap = new Map(firestoreProducts.map(p => [p.id, p]));
     
-    // PERFORM PROPERTY-LEVEL MERGE WITH DELTA LOGIC
     const merged = base.map(p => {
       const fsProduct = firestoreMap.get(p.id);
       if (!fsProduct) return p;
-      
-      // If fsProduct has a name, it's a full manual override (absolute value)
       if (fsProduct.name) {
         return { ...p, ...fsProduct };
       }
-      
-      // If fsProduct exists but has no name, it was created by an atomic increment/decrement (delta)
       return { 
         ...p, 
         ...fsProduct, 
@@ -186,7 +181,6 @@ function AdminContent() {
     if (!order || !order.id) return;
     const orderRef = doc(db, "Orders", order.id);
     
-    // 1. Update Order Status & Financials
     updateDocumentNonBlocking(orderRef, {
       status: "Approved",
       items: order.items,
@@ -194,7 +188,6 @@ function AdminContent() {
       updatedAt: new Date().toISOString()
     });
 
-    // 2. Sync Inventory (Reduce Stock)
     if (order.items && Array.isArray(order.items)) {
       order.items.forEach((item: any) => {
         if (item.id) {
@@ -221,13 +214,11 @@ function AdminContent() {
     
     const orderRef = doc(db, "Orders", order.id);
     
-    // 1. Update Status to Cancelled
     updateDocumentNonBlocking(orderRef, {
       status: "Cancelled",
       updatedAt: new Date().toISOString()
     });
 
-    // 2. Reverse Stock IF it was already Approved (and thus decremented)
     if (wasApproved && order.items && Array.isArray(order.items)) {
       order.items.forEach((item: any) => {
         if (item.id) {
@@ -253,7 +244,6 @@ function AdminContent() {
     if (!order || !order.id) return;
     const wasApproved = order.status === "Approved";
     
-    // 1. Reverse Stock IF it was Approved
     if (wasApproved && order.items && Array.isArray(order.items)) {
       order.items.forEach((item: any) => {
         if (item.id) {
@@ -268,7 +258,6 @@ function AdminContent() {
       });
     }
 
-    // 2. Purge order from registry
     deleteDocumentNonBlocking(doc(db, "Orders", order.id));
     setOrderToDelete(null);
     toast({ 
@@ -712,13 +701,13 @@ function AdminContent() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Input placeholder="ID" value={editingProduct?.id} onChange={(e) => setEditingProduct({...editingProduct, id: e.target.value})} className="rounded-none" />
-              <Input placeholder="NAME" value={editingProduct?.name} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="rounded-none" />
+              <Input placeholder="ID" value={editingProduct?.id ?? ""} onChange={(e) => setEditingProduct({...editingProduct, id: e.target.value})} className="rounded-none" />
+              <Input placeholder="NAME" value={editingProduct?.name ?? ""} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="rounded-none" />
             </div>
             <div className="grid grid-cols-3 gap-4">
-              <Input type="number" placeholder="MRP" value={editingProduct?.mrp} onChange={(e) => setEditingProduct({...editingProduct, mrp: e.target.value})} className="rounded-none" />
-              <Input type="number" placeholder="MARGIN %" value={editingProduct?.margin} onChange={(e) => setEditingProduct({...editingProduct, margin: e.target.value})} className="rounded-none" />
-              <Input type="number" placeholder="STOCK" value={editingProduct?.stockQuantity} onChange={(e) => setEditingProduct({...editingProduct, stockQuantity: e.target.value})} className="rounded-none" />
+              <Input type="number" placeholder="MRP" value={editingProduct?.mrp ?? 0} onChange={(e) => setEditingProduct({...editingProduct, mrp: e.target.value})} className="rounded-none" />
+              <Input type="number" placeholder="MARGIN %" value={editingProduct?.margin ?? 0} onChange={(e) => setEditingProduct({...editingProduct, margin: e.target.value})} className="rounded-none" />
+              <Input type="number" placeholder="STOCK" value={editingProduct?.stockQuantity ?? 0} onChange={(e) => setEditingProduct({...editingProduct, stockQuantity: e.target.value})} className="rounded-none" />
             </div>
             <Button onClick={handleSaveProduct} className="w-full h-14 bg-primary text-background rounded-none uppercase font-black text-[10px]">Save Article</Button>
           </div>
@@ -759,7 +748,7 @@ function AdminContent() {
                       <TableCell>
                         <Input 
                           type="number" 
-                          value={item.margin} 
+                          value={item.margin ?? 0} 
                           onChange={(e) => handleUpdateOrderItem(i, 'margin', e.target.value)}
                           className="h-8 w-20 rounded-none text-[10px] font-black text-accent"
                           disabled={editingOrder.status !== 'Processing'}
@@ -769,7 +758,7 @@ function AdminContent() {
                       <TableCell>
                         <Input 
                           type="number" 
-                          value={item.quantity} 
+                          value={item.quantity ?? 0} 
                           onChange={(e) => handleUpdateOrderItem(i, 'quantity', e.target.value)}
                           className="h-8 w-20 rounded-none text-[10px] font-black"
                           disabled={editingOrder.status !== 'Processing'}
