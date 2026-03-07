@@ -15,7 +15,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   Phone as PhoneIcon,
-  Fingerprint
+  Fingerprint,
+  MapPin
 } from "lucide-react";
 import { useFirestore, useCollection, useMemoFirebase, useUser, useAuth } from "@/firebase";
 import { collection, query, orderBy, doc, where, getDocs } from "firebase/firestore";
@@ -40,6 +41,19 @@ import {
 import { AdminAuthGuard } from "@/components/auth/AdminAuthGuard";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+const GST_STATE_CODES: Record<string, string> = {
+  "01": "Jammu & Kashmir", "02": "Himachal Pradesh", "03": "Punjab", "04": "Chandigarh",
+  "05": "Uttarakhand", "06": "Haryana", "07": "Delhi", "08": "Rajasthan",
+  "09": "Uttar Pradesh", "10": "Bihar", "11": "Sikkim", "12": "Arunachal Pradesh",
+  "13": "Nagaland", "14": "Manipur", "15": "Mizoram", "16": "Tripura",
+  "17": "Meghalaya", "18": "Assam", "19": "West Bengal", "20": "Jharkhand",
+  "21": "Odisha", "22": "Chhattisgarh", "23": "Madhya Pradesh", "24": "Gujarat",
+  "25": "Daman & Diu", "26": "Dadra & Nagar Haveli", "27": "Maharashtra",
+  "29": "Karnataka", "30": "Goa", "31": "Lakshadweep", "32": "Kerala",
+  "33": "Tamil Nadu", "34": "Puducherry", "35": "Andaman & Nicobar Islands",
+  "36": "Telangana", "37": "Andhra Pradesh", "38": "Ladakh"
+};
 
 export default function Admin1Page() {
   return (
@@ -97,6 +111,12 @@ function Admin1Content() {
     return Array.from(map.values()).sort((a, b) => (a.firmName || "").localeCompare(b.firmName || ""));
   }, [retailers]);
 
+  const getStateFromGST = (gst: string) => {
+    if (!gst || gst.length < 2) return "Unknown";
+    const code = gst.substring(0, 2);
+    return GST_STATE_CODES[code] || "Other";
+  };
+
   const handleAdminLogout = async () => {
     sessionStorage.removeItem("admin_terminal_authorized");
     await signOut(auth);
@@ -105,13 +125,11 @@ function Admin1Content() {
   };
 
   const handleApproveRequest = (req: any) => {
-    // 1. Generate unique 6-digit code
     const accessCode = Math.floor(100000 + Math.random() * 900000).toString();
     
     const reqRef = doc(db, "PendingRequests", req.id);
     const authUserRef = doc(db, "AuthorizedUsers", req.id);
 
-    // 2. Update Pending Request status and assign code
     updateDocumentNonBlocking(reqRef, {
       status: "Approved",
       accessCode: accessCode,
@@ -119,7 +137,6 @@ function Admin1Content() {
       approvedAt: new Date().toISOString()
     });
 
-    // 3. Create the active AuthorizedUser profile
     setDocumentNonBlocking(authUserRef, {
       id: req.id,
       firmName: req.firmName,
@@ -153,7 +170,6 @@ function Admin1Content() {
 
     setDocumentNonBlocking(reqRef, updateData, { merge: true });
 
-    // Sync with AuthorizedUsers if already approved
     const syncProfile = async () => {
       const q = query(collection(db, "AuthorizedUsers"), where("originalRequestId", "==", editingRequest.id));
       const snap = await getDocs(q);
@@ -318,7 +334,7 @@ function Admin1Content() {
               <div className="p-4 border-b border-primary/5">
                 <div className="relative max-w-sm">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-primary/20" />
-                  <Input placeholder="SEARCH FIRM, GST OR PHONE..." className="pl-10 rounded-none h-10 text-[10px] uppercase font-black" value={searchTerm ?? ""} onChange={(e) => setSearchTerm(e.target.value)} />
+                  <input placeholder="SEARCH FIRM, GST OR PHONE..." className="pl-10 w-full h-10 border border-primary/10 focus:outline-none text-[10px] uppercase font-black" value={searchTerm ?? ""} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
               </div>
               <div className="overflow-x-auto">
@@ -327,10 +343,11 @@ function Admin1Content() {
                     <TableRow className="border-primary/10">
                       <TableHead className="uppercase font-black text-[10px]">Status</TableHead>
                       <TableHead className="uppercase font-black text-[10px]">Firm</TableHead>
-                      <TableHead className="uppercase font-black text-[10px]">Phone Number</TableHead>
-                      <TableHead className="uppercase font-black text-[10px]">GST Identifier</TableHead>
+                      <TableHead className="uppercase font-black text-[10px]">GST & State</TableHead>
+                      <TableHead className="uppercase font-black text-[10px]">Phone</TableHead>
                       <TableHead className="uppercase font-black text-[10px]">Access Code</TableHead>
-                      <TableHead className="uppercase font-black text-[10px]">Opening Balance</TableHead>
+                      <TableHead className="uppercase font-black text-[10px]">Credit Limit</TableHead>
+                      <TableHead className="uppercase font-black text-[10px]">Opening Bal.</TableHead>
                       <TableHead className="uppercase font-black text-[10px]">Current O/S</TableHead>
                       <TableHead className="uppercase font-black text-[10px] text-right">Actions</TableHead>
                     </TableRow>
@@ -338,6 +355,7 @@ function Admin1Content() {
                   <TableBody>
                     {filteredRequests?.map((req) => {
                       const currentOS = calculateCurrentOS(req);
+                      const stateName = getStateFromGST(req.gst || "");
                       return (
                         <TableRow key={req.id} className="border-primary/5">
                           <TableCell>
@@ -347,8 +365,15 @@ function Admin1Content() {
                             </Badge>
                           </TableCell>
                           <TableCell className="font-black text-[10px] uppercase truncate max-w-[120px]">{req.firmName}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-mono text-[9px] uppercase text-accent font-bold tracking-tight">{req.gst}</span>
+                              <span className="text-[8px] opacity-40 font-black flex items-center gap-1 uppercase">
+                                <MapPin className="h-2 w-2" /> {stateName}
+                              </span>
+                            </div>
+                          </TableCell>
                           <TableCell className="font-mono text-[10px] font-bold">{req.phone}</TableCell>
-                          <TableCell className="font-mono text-[9px] uppercase text-accent font-bold tracking-tight">{req.gst}</TableCell>
                           <TableCell className="font-mono text-[10px] font-black text-primary">
                             {req.accessCode ? (
                               <div className="flex items-center gap-1">
@@ -356,6 +381,7 @@ function Admin1Content() {
                               </div>
                             ) : "---"}
                           </TableCell>
+                          <TableCell className="font-black text-[10px] text-primary">₹{parseAmount(req.creditLimit).toLocaleString()}</TableCell>
                           <TableCell className={cn("font-black text-[10px]", parseAmount(req.openingBalance) < 0 ? "text-red-600" : "text-accent")}>₹{parseAmount(req.openingBalance).toLocaleString()}</TableCell>
                           <TableCell className={cn("font-black text-[10px]", currentOS > 0 ? "text-red-600" : "text-green-600")}>₹{currentOS.toLocaleString()}</TableCell>
                           <TableCell className="text-right">
