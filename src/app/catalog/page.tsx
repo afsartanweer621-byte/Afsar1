@@ -14,11 +14,7 @@ import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from "@
 import { collection, doc } from "firebase/firestore";
 import { useCart } from "@/context/CartContext";
 import { HeroCarousel } from "@/components/home/HeroCarousel";
-
-const FALLBACK_PRODUCTS = [
-  { id: '1021-Prado-Hill', name: '1021-Prado Hill', stockQuantity: 26, mrp: 999, margin: 38, price: 619.38, category: 'Prado Hill', displayOrder: 1 },
-  { id: 'SH-1401', name: 'SH-1401', stockQuantity: 4, mrp: 999, margin: 38, price: 619.38, category: 'SH-Series', displayOrder: 112 },
-];
+import { FALLBACK_PRODUCTS } from "@/lib/fallback-products";
 
 const PRODUCTS_PER_PAGE = 50;
 
@@ -83,7 +79,7 @@ export default function CatalogPage() {
       }
     });
     
-    // Sync with Admin soft-delete flag
+    // Filter out items marked as deleted
     return merged
       .filter(p => !p.deleted)
       .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
