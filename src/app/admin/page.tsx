@@ -146,10 +146,11 @@ function AdminContent() {
 
   const filteredProducts = useMemo(() => {
     if (!productSearch) return mergedProducts;
+    const lowerSearch = productSearch.toLowerCase();
     return mergedProducts.filter(p => 
-      p.id.toLowerCase().includes(productSearch.toLowerCase()) ||
-      p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-      (p.category && p.category.toLowerCase().includes(productSearch.toLowerCase()))
+      (p.id?.toLowerCase() || "").includes(lowerSearch) ||
+      (p.name?.toLowerCase() || "").includes(lowerSearch) ||
+      (p.category?.toLowerCase() || "").includes(lowerSearch)
     );
   }, [mergedProducts, productSearch]);
 
@@ -513,7 +514,7 @@ function AdminContent() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {mergedProducts.map((p) => (
+                    {filteredProducts.map((p) => (
                       <TableRow key={p.id} className="border-primary/5">
                         <TableCell>
                           <div className="relative h-8 w-8 bg-primary/5">
