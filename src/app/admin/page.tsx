@@ -125,7 +125,12 @@ function AdminContent() {
     }
 
     const firestoreMap = new Map(firestoreProducts.map(p => [p.id, p]));
-    const merged = base.map(p => firestoreMap.get(p.id) || p);
+    
+    // PERFORM PROPERTY-LEVEL MERGE TO PRESERVE FALLBACK DATA (NAME, CAT)
+    const merged = base.map(p => {
+      const fsProduct = firestoreMap.get(p.id);
+      return fsProduct ? { ...p, ...fsProduct } : p;
+    });
     
     const fallbackIds = new Set(base.map(p => p.id));
     firestoreProducts.forEach(p => {
@@ -161,6 +166,7 @@ function AdminContent() {
   };
 
   const handleApproveOrder = (order: any) => {
+    if (!order || !order.id) return;
     const orderRef = doc(db, "Orders", order.id);
     
     // 1. Update Order Status & Financials
@@ -172,12 +178,19 @@ function AdminContent() {
     });
 
     // 2. Sync Inventory (Reduce Stock)
-    order.items.forEach((item: any) => {
-      const productRef = doc(db, "Products", item.id);
-      updateDocumentNonBlocking(productRef, {
-        stockQuantity: increment(-(item.quantity || 0))
+    if (order.items && Array.isArray(order.items)) {
+      order.items.forEach((item: any) => {
+        if (item.id) {
+          const productRef = doc(db, "Products", item.id);
+          const qtyToReduce = Math.abs(parseInt(String(item.quantity)) || 0);
+          if (qtyToReduce > 0) {
+            updateDocumentNonBlocking(productRef, {
+              stockQuantity: increment(-qtyToReduce)
+            });
+          }
+        }
       });
-    });
+    }
 
     toast({ 
       title: "Order Approved & Stock Synced", 
@@ -186,31 +199,37 @@ function AdminContent() {
   };
 
   const handleCancelOrder = (order: any) => {
+    if (!order || !order.id) return;
     const wasApproved = order.status === "Approved";
     
     // Safety check for approved orders
     if (wasApproved) {
       const confirmed = window.confirm(
-        "WARNING: This order is already APPROVED. Rejecting it will automatically REVERSE the stock quantity and return items to active inventory. Proceed?"
+        "WARNING: This order is already APPROVED. Rejection will automatically REVERSE the stock decrement and return items to active inventory. Proceed?"
       );
       if (!confirmed) return;
     }
 
     const orderRef = doc(db, "Orders", order.id);
     
-    // 1. Update Status
+    // 1. Update Status to Cancelled
     updateDocumentNonBlocking(orderRef, {
       status: "Cancelled",
       updatedAt: new Date().toISOString()
     });
 
-    // 2. Reverse Stock if it was already Approved
-    if (wasApproved) {
+    // 2. Reverse Stock IF it was already Approved (and thus decremented)
+    if (wasApproved && order.items && Array.isArray(order.items)) {
       order.items.forEach((item: any) => {
-        const productRef = doc(db, "Products", item.id);
-        updateDocumentNonBlocking(productRef, {
-          stockQuantity: increment(Number(item.quantity) || 0)
-        });
+        if (item.id) {
+          const productRef = doc(db, "Products", item.id);
+          const qtyToRestore = Math.abs(parseInt(String(item.quantity)) || 0);
+          if (qtyToRestore > 0) {
+            updateDocumentNonBlocking(productRef, {
+              stockQuantity: increment(qtyToRestore)
+            });
+          }
+        }
       });
       toast({ 
         title: "Order Rejected & Stock Reversed", 
