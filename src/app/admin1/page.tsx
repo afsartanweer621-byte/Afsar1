@@ -175,6 +175,8 @@ function Admin1Content() {
       ...editingRequest,
       openingBalance: openingBal,
       creditLimit: creditLim,
+      firmName: editingRequest.firmName,
+      phone: editingRequest.phone,
       gst: editingRequest.gst || "",
       updatedAt: new Date().toISOString()
     };
@@ -547,11 +549,28 @@ function Admin1Content() {
               <Input value={editingRequest?.firmName ?? ""} onChange={(e) => setEditingRequest({...editingRequest, firmName: e.target.value})} className="rounded-none h-12 font-black" />
             </div>
             <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase">Phone Number</Label>
+              <Input value={editingRequest?.phone ?? ""} onChange={(e) => setEditingRequest({...editingRequest, phone: e.target.value})} className="rounded-none h-12 font-black" />
+            </div>
+            <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase">GST Identifier</Label>
               <Input value={editingRequest?.gst ?? ""} onChange={(e) => setEditingRequest({...editingRequest, gst: e.target.value.toUpperCase()})} className="rounded-none h-12 font-black uppercase" />
+              {editingRequest?.gst && (
+                <div className="flex items-center gap-2 text-[9px] font-black uppercase text-accent mt-1">
+                  <MapPin className="h-3 w-3" /> State: {getStateFromGST(editingRequest.gst)}
+                </div>
+              )}
             </div>
-            <div className="space-y-2"><Label className="text-[10px] font-black uppercase">Opening Balance (INR)</Label><Input type="number" value={editingRequest?.openingBalance ?? 0} onChange={(e) => setEditingRequest({...editingRequest, openingBalance: e.target.value})} className="rounded-none h-12 font-black" /></div>
-            <div className="space-y-2"><Label className="text-[10px] font-black uppercase">Credit Limit (INR)</Label><Input type="number" value={editingRequest?.creditLimit ?? 0} onChange={(e) => setEditingRequest({...editingRequest, creditLimit: e.target.value})} className="rounded-none h-12 font-black" /></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase">Opening Bal.</Label>
+                <Input type="number" value={editingRequest?.openingBalance ?? 0} onChange={(e) => setEditingRequest({...editingRequest, openingBalance: e.target.value})} className="rounded-none h-12 font-black" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase">Limit (INR)</Label>
+                <Input type="number" value={editingRequest?.creditLimit ?? 0} onChange={(e) => setEditingRequest({...editingRequest, creditLimit: e.target.value})} className="rounded-none h-12 font-black" />
+              </div>
+            </div>
             <Button onClick={handleSaveEdit} className="w-full h-14 bg-primary text-background rounded-none uppercase font-black text-[10px]">Sync Registry</Button>
           </div>
         </DialogContent>
