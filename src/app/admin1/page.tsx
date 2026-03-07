@@ -18,7 +18,8 @@ import {
   Fingerprint,
   MapPin,
   UserPlus,
-  Download
+  Download,
+  Filter
 } from "lucide-react";
 import { useFirestore, useCollection, useMemoFirebase, useUser, useAuth } from "@/firebase";
 import { collection, query, orderBy, doc, where, getDocs } from "firebase/firestore";
@@ -73,6 +74,7 @@ function Admin1Content() {
   
   const [activeTab, setActiveTab] = useState("registrations");
   const [searchTerm, setSearchTerm] = useState("");
+  const [paymentRetailerSearch, setPaymentRetailerSearch] = useState("");
   const [editingRequest, setEditingRequest] = useState<any>(null);
   const [editingPayment, setEditingPayment] = useState<any>(null);
   const [deleteRequestId, setDeleteRequestId] = useState<string | null>(null);
@@ -109,17 +111,21 @@ function Admin1Content() {
     req.phone?.includes(searchTerm)
   );
 
+  // Dropdown only contains retailers present in the Master Registry (Approved requests)
   const uniqueRetailersForDropdown = useMemo(() => {
-    if (!retailers) return [];
-    const map = new Map();
-    retailers.forEach(r => {
-      const key = r.gst || r.firmName || r.id;
-      if (!map.has(key) || !r.originalRequestId) {
-        map.set(key, r);
-      }
-    });
-    return Array.from(map.values()).sort((a, b) => (a.firmName || "").localeCompare(b.firmName || ""));
-  }, [retailers]);
+    if (!requests) return [];
+    return requests
+      .filter(req => req.status === 'Approved')
+      .sort((a, b) => (a.firmName || "").localeCompare(b.firmName || ""));
+  }, [requests]);
+
+  const filteredPaymentRetailers = useMemo(() => {
+    if (!paymentRetailerSearch) return uniqueRetailersForDropdown;
+    return uniqueRetailersForDropdown.filter(r => 
+      (r.firmName || "").toLowerCase().includes(paymentRetailerSearch.toLowerCase()) ||
+      (r.gst || "").toLowerCase().includes(paymentRetailerSearch.toLowerCase())
+    );
+  }, [uniqueRetailersForDropdown, paymentRetailerSearch]);
 
   const getStateFromGST = (gst: string) => {
     if (!gst || gst.length < 2) return "N/A";
@@ -316,6 +322,7 @@ function Admin1Content() {
 
     setDocumentNonBlocking(paymentRef, paymentData, { merge: true });
     setEditingPayment(null);
+    setPaymentRetailerSearch("");
     toast({ title: "Payment Recorded" });
   };
 
@@ -388,7 +395,7 @@ function Admin1Content() {
   };
 
   const getRetailerName = (uid: string) => {
-    const r = retailers?.find(ret => (ret.id === uid || ret.originalRequestId === uid));
+    const r = uniqueRetailersForDropdown.find(ret => ret.id === uid);
     return r?.firmName || uid.slice(0, 6);
   };
 
@@ -625,16 +632,84 @@ function Admin1Content() {
 
       <Dialog open={!!editingPayment} onOpenChange={() => setEditingPayment(null)}>
         <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto rounded-none bg-background p-6">
-          <DialogHeader className="mb-4"><DialogTitle className="text-2xl font-black uppercase">Payment Entry</DialogTitle></DialogHeader>
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-2xl font-black uppercase">Payment Entry</DialogTitle>
+          </DialogHeader>
           <div className="space-y-6">
-            <select className="w-full h-12 border border-primary/10 bg-transparent px-3 text-[10px] font-black uppercase" value={editingPayment?.userId ?? ""} onChange={(e) => setEditingPayment({...editingPayment, userId: e.target.value})}>
-              <option value="">Select Firm...</option>
-              {uniqueRetailersForDropdown.map(r => (<option key={r.id} value={r.id}>{r.firmName}</option>))}
-            </select>
-            <Input type="datetime-local" value={editingPayment?.paymentDate?.slice(0, 16) ?? ""} onChange={(e) => setEditingPayment({...editingPayment, paymentDate: e.target.value})} className="h-12 font-bold text-[10px]" />
-            <Input type="number" placeholder="Amount" value={editingPayment?.amount ?? 0} onChange={(e) => setEditingPayment({...editingPayment, amount: e.target.value})} className="h-12 font-black text-green-600" />
-            <Input placeholder="Remarks" value={editingPayment?.remarks ?? ""} onChange={(e) => setEditingPayment({...editingPayment, remarks: e.target.value})} className="h-12 text-[10px]" />
-            <Button onClick={handleSavePayment} className="w-full h-14 bg-primary text-background rounded-none uppercase font-black text-[10px]">Finalize Payment</Button>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                <Filter className="h-3 w-3 text-accent" /> Select Retailer
+              </Label>
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-3 w-3 text-primary/30" />
+                  <Input 
+                    placeholder="Search Firm or GST..." 
+                    className="pl-9 rounded-none h-10 text-[10px] uppercase font-bold border-primary/10"
+                    value={paymentRetailerSearch}
+                    onChange={(e) => setPaymentRetailerSearch(e.target.value)}
+                  />
+                </div>
+                <div className="border border-primary/5 rounded-none max-h-48 overflow-y-auto bg-primary/5 custom-scrollbar">
+                  {filteredPaymentRetailers.length === 0 ? (
+                    <div className="p-4 text-center text-[9px] font-black uppercase opacity-40">No matching retailers</div>
+                  ) : filteredPaymentRetailers.map(r => (
+                    <button
+                      key={r.id}
+                      onClick={() => setEditingPayment({...editingPayment, userId: r.id})}
+                      className={cn(
+                        "w-full text-left px-4 py-3 text-[10px] font-black uppercase border-b border-primary/5 last:border-none transition-colors",
+                        editingPayment?.userId === r.id ? "bg-accent text-white" : "hover:bg-primary/10"
+                      )}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="truncate max-w-[200px]">{r.firmName}</span>
+                        <span className="text-[8px] opacity-60 font-mono">{r.gst || "NO GST"}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest">Payment Date & Time</Label>
+              <Input 
+                type="datetime-local" 
+                value={editingPayment?.paymentDate?.slice(0, 16) ?? ""} 
+                onChange={(e) => setEditingPayment({...editingPayment, paymentDate: e.target.value})} 
+                className="h-12 font-bold text-[10px] rounded-none" 
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest">Amount (INR)</Label>
+              <Input 
+                type="number" 
+                placeholder="0.00" 
+                value={editingPayment?.amount ?? 0} 
+                onChange={(e) => setEditingPayment({...editingPayment, amount: e.target.value})} 
+                className="h-12 font-black text-green-600 rounded-none text-lg" 
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest">Remarks / Audit Note</Label>
+              <Input 
+                placeholder="BANK TRANSFER REF, CHEQUE NO, ETC." 
+                value={editingPayment?.remarks ?? ""} 
+                onChange={(e) => setEditingPayment({...editingPayment, remarks: e.target.value.toUpperCase()})} 
+                className="h-12 text-[10px] rounded-none uppercase" 
+              />
+            </div>
+
+            <Button 
+              onClick={handleSavePayment} 
+              disabled={!editingPayment?.userId || !editingPayment?.amount}
+              className="w-full h-14 bg-primary text-background rounded-none uppercase font-black text-[10px] tracking-widest disabled:opacity-30"
+            >
+              Finalize Payment
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
