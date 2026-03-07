@@ -163,9 +163,11 @@ function AdminContent() {
     const orderRef = doc(db, "Orders", order.id);
     updateDocumentNonBlocking(orderRef, {
       status: "Approved",
+      items: order.items,
+      totalAmount: order.totalAmount,
       updatedAt: new Date().toISOString()
     });
-    toast({ title: "Order Approved", description: `Order #${order.id.slice(0,8)} is now confirmed.` });
+    toast({ title: "Order Approved", description: `Order #${order.id.slice(0,8)} is now confirmed with final edits.` });
   };
 
   const handleRejectOrder = (order: any) => {
@@ -313,6 +315,35 @@ function AdminContent() {
     reader.readAsText(file);
   };
 
+  // Helper to update items within the locally edited order
+  const handleUpdateOrderItem = (idx: number, field: string, value: string) => {
+    if (!editingOrder) return;
+    
+    const newItems = [...editingOrder.items];
+    const item = { ...newItems[idx] };
+    
+    if (field === 'quantity') {
+      item.quantity = parseInt(value) || 0;
+    } else if (field === 'margin') {
+      const marginVal = parseFloat(value) || 0;
+      item.margin = marginVal;
+      // Re-calculate price based on MRP and new margin
+      const mrp = item.mrp || item.price / (1 - (item.margin / 100)); // Fallback calc if mrp not present
+      item.price = mrp * (1 - (marginVal / 100));
+    }
+    
+    newItems[idx] = item;
+    
+    // Recalculate total
+    const newTotal = newItems.reduce((acc, curr) => acc + (curr.price * curr.quantity), 0);
+    
+    setEditingOrder({
+      ...editingOrder,
+      items: newItems,
+      totalAmount: newTotal
+    });
+  };
+
   if (!mounted || isUserLoading) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-6">
@@ -426,7 +457,7 @@ function AdminContent() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredProducts.map((p) => (
+                    {mergedProducts.map((p) => (
                       <TableRow key={p.id} className="border-primary/5">
                         <TableCell>
                           <div className="relative h-8 w-8 bg-primary/5">
@@ -555,12 +586,15 @@ function AdminContent() {
         </DialogContent>
       </Dialog>
 
-      {/* Order Detail Dialog */}
+      {/* Order Detail Dialog (Interactive Review) */}
       <Dialog open={!!editingOrder} onOpenChange={() => setEditingOrder(null)}>
-        <DialogContent className="max-w-[95vw] md:max-w-3xl rounded-none p-8 bg-background">
+        <DialogContent className="max-w-[95vw] md:max-w-4xl rounded-none p-8 bg-background max-h-[90vh] overflow-y-auto">
           <DialogHeader className="mb-6">
-            <DialogTitle className="text-3xl font-black uppercase">Order Review</DialogTitle>
-            <div className="text-[10px] font-black uppercase text-accent">Order ID: #{editingOrder?.id?.slice(0,12)}</div>
+            <DialogTitle className="text-3xl font-black uppercase">Order Review & Edit</DialogTitle>
+            <div className="flex justify-between items-center mt-2">
+              <div className="text-[10px] font-black uppercase text-accent">Order ID: #{editingOrder?.id?.slice(0,12)}</div>
+              <Badge className="rounded-none bg-primary/5 text-primary uppercase font-black text-[9px]">{editingOrder?.status}</Badge>
+            </div>
           </DialogHeader>
           <div className="space-y-6">
             <div className="border border-primary/5">
@@ -568,7 +602,9 @@ function AdminContent() {
                 <TableHeader className="bg-primary/5">
                   <TableRow>
                     <TableHead className="uppercase font-black text-[10px]">Article</TableHead>
-                    <TableHead className="uppercase font-black text-[10px]">Price</TableHead>
+                    <TableHead className="uppercase font-black text-[10px]">MRP</TableHead>
+                    <TableHead className="uppercase font-black text-[10px]">Margin %</TableHead>
+                    <TableHead className="uppercase font-black text-[10px]">W/S Price</TableHead>
                     <TableHead className="uppercase font-black text-[10px]">Qty</TableHead>
                     <TableHead className="uppercase font-black text-[10px] text-right">Subtotal</TableHead>
                   </TableRow>
@@ -576,25 +612,65 @@ function AdminContent() {
                 <TableBody>
                   {editingOrder?.items?.map((item: any, i: number) => (
                     <TableRow key={i}>
-                      <TableCell className="text-[10px] font-black uppercase">{item.name}</TableCell>
-                      <TableCell className="text-[10px] font-bold">₹{item.price?.toLocaleString()}</TableCell>
-                      <TableCell className="text-[10px] font-bold">{item.quantity}</TableCell>
-                      <TableCell className="text-right text-[10px] font-black">₹{(item.price * item.quantity).toLocaleString()}</TableCell>
+                      <TableCell className="text-[10px] font-black uppercase">
+                        {item.name}
+                        <div className="text-[8px] opacity-40 font-normal">SKU: {item.id}</div>
+                      </TableCell>
+                      <TableCell className="text-[10px] font-bold">₹{item.mrp || (item.price / (1 - (item.margin / 100))).toFixed(0)}</TableCell>
+                      <TableCell>
+                        <Input 
+                          type="number" 
+                          value={item.margin} 
+                          onChange={(e) => handleUpdateOrderItem(i, 'margin', e.target.value)}
+                          className="h-8 w-20 rounded-none text-[10px] font-black text-accent"
+                          disabled={editingOrder.status !== 'Processing'}
+                        />
+                      </TableCell>
+                      <TableCell className="text-[10px] font-bold">₹{item.price?.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
+                      <TableCell>
+                        <Input 
+                          type="number" 
+                          value={item.quantity} 
+                          onChange={(e) => handleUpdateOrderItem(i, 'quantity', e.target.value)}
+                          className="h-8 w-20 rounded-none text-[10px] font-black"
+                          disabled={editingOrder.status !== 'Processing'}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right text-[10px] font-black">₹{(item.price * item.quantity).toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
                     </TableRow>
                   ))}
                   <TableRow className="bg-primary/5">
-                    <TableCell colSpan={3} className="text-right text-[10px] font-black uppercase py-4">Order Total</TableCell>
-                    <TableCell className="text-right text-xl font-black">₹{editingOrder?.totalAmount?.toLocaleString()}</TableCell>
+                    <TableCell colSpan={5} className="text-right text-[10px] font-black uppercase py-6">Order Total (Adjusted)</TableCell>
+                    <TableCell className="text-right text-xl font-black">₹{editingOrder?.totalAmount?.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
             </div>
+
             {editingOrder?.status === 'Processing' && (
               <div className="flex gap-4 pt-4">
-                <Button onClick={() => { handleApproveOrder(editingOrder); setEditingOrder(null); }} className="flex-1 h-14 bg-green-600 text-white rounded-none uppercase font-black text-[11px]">Approve Order</Button>
-                <Button onClick={() => { handleRejectOrder(editingOrder); setEditingOrder(null); }} variant="destructive" className="flex-1 h-14 rounded-none uppercase font-black text-[11px]">Reject Order</Button>
+                <Button 
+                  onClick={() => { handleApproveOrder(editingOrder); setEditingOrder(null); }} 
+                  className="flex-1 h-14 bg-green-600 text-white rounded-none uppercase font-black text-[11px] tracking-widest"
+                >
+                  Approve with Edits
+                </Button>
+                <Button 
+                  onClick={() => { handleRejectOrder(editingOrder); setEditingOrder(null); }} 
+                  variant="destructive" 
+                  className="flex-1 h-14 rounded-none uppercase font-black text-[11px] tracking-widest"
+                >
+                  Reject Order
+                </Button>
               </div>
             )}
+            
+            <div className="p-4 bg-secondary/5 border-l-4 border-accent">
+              <p className="text-[10px] font-black uppercase text-accent mb-1">Financial Note</p>
+              <p className="text-[9px] opacity-60 font-medium uppercase leading-relaxed">
+                Applying edits here will update the registry record and the retailer's outstanding balance immediately upon approval.
+              </p>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
