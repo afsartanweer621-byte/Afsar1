@@ -175,7 +175,7 @@ function AdminContent() {
     order.items.forEach((item: any) => {
       const productRef = doc(db, "Products", item.id);
       updateDocumentNonBlocking(productRef, {
-        stockQuantity: increment(-item.quantity)
+        stockQuantity: increment(-(item.quantity || 0))
       });
     });
 
@@ -191,7 +191,7 @@ function AdminContent() {
     // Safety check for approved orders
     if (wasApproved) {
       const confirmed = window.confirm(
-        "WARNING: This order is already APPROVED. Rejecting it will automatically REVERSE the stock quantity and return items to active inventory. This will also remove the entry from the retailer's outstanding balance. Proceed?"
+        "WARNING: This order is already APPROVED. Rejecting it will automatically REVERSE the stock quantity and return items to active inventory. Proceed?"
       );
       if (!confirmed) return;
     }
@@ -209,7 +209,7 @@ function AdminContent() {
       order.items.forEach((item: any) => {
         const productRef = doc(db, "Products", item.id);
         updateDocumentNonBlocking(productRef, {
-          stockQuantity: increment(item.quantity)
+          stockQuantity: increment(Number(item.quantity) || 0)
         });
       });
       toast({ 
@@ -451,10 +451,9 @@ function AdminContent() {
                             {order.status === 'Processing' && (
                               <Button size="sm" onClick={() => handleApproveOrder(order)} className="h-8 bg-green-600 text-white rounded-none uppercase font-black text-[8px] px-3">Approve</Button>
                             )}
-                            {order.status !== 'Cancelled' && (
-                              <Button size="sm" onClick={() => handleCancelOrder(order)} variant="destructive" className="h-8 rounded-none uppercase font-black text-[8px] px-3">Reject</Button>
-                            )}
-                            <Button variant="ghost" size="sm" onClick={() => setEditingOrder(order)} className="p-1"><ExternalLink className="h-3 w-3" /></Button>
+                            <Button variant="ghost" size="sm" onClick={() => setEditingOrder(order)} className="p-1 h-8 w-8 hover:bg-accent/10 border border-primary/5 rounded-none flex items-center justify-center">
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
