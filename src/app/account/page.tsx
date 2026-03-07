@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -7,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { 
   User, 
   Download,
@@ -15,9 +18,12 @@ import {
   ArrowRight,
   Clock,
   FileText,
-  FileSpreadsheet
+  FileSpreadsheet,
+  CreditCard,
+  ShieldCheck,
+  Zap
 } from "lucide-react";
-import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
+import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc, setDocumentNonBlocking } from "@/firebase";
 import { collection, query, where, doc } from "firebase/firestore";
 import { cn } from "@/lib/utils";
 import jsPDF from "jspdf";
@@ -31,6 +37,8 @@ export default function AccountPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [paymentAmount, setPaymentAmount] = useState<string>("");
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -66,7 +74,6 @@ export default function AccountPage() {
     });
   };
 
-  // Ensure orders are in Ascending order (oldest first)
   const sortedOrders = useMemo(() => rawOrders ? [...rawOrders].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) : [], [rawOrders]);
   const sortedPayments = useMemo(() => rawPayments ? [...rawPayments].filter(p => !p.deleted).sort((a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()) : [], [rawPayments]);
 
@@ -84,7 +91,7 @@ export default function AccountPage() {
       ...sortedPayments.map(p => ({
         id: p.id,
         date: p.paymentDate,
-        description: p.remarks || "Direct Transfer",
+        description: p.remarks || "Online Payment (Razorpay)",
         type: 'Credit',
         amount: parseAmount(p.amount),
         status: 'Processed',
@@ -108,6 +115,83 @@ export default function AccountPage() {
   const currentOutstanding = totalDebits - totalCredits;
 
   const utilizationPercent = Math.min(100, (Math.max(0, currentOutstanding) / (profile?.creditLimit || 1)) * 100);
+
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const handlePayNow = async () => {
+    const amount = parseFloat(paymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({ variant: "destructive", title: "Invalid Amount", description: "Please enter a valid payment amount." });
+      return;
+    }
+
+    setIsProcessingPayment(true);
+    const res = await loadRazorpayScript();
+
+    if (!res) {
+      toast({ variant: "destructive", title: "SDK Load Failed", description: "Razorpay SDK could not be loaded. Please check your internet." });
+      setIsProcessingPayment(false);
+      return;
+    }
+
+    const options = {
+      key: "rzp_test_your_key_here", // Placeholder for actual Razorpay Key
+      amount: amount * 100, // Amount in paise
+      currency: "INR",
+      name: "Mochibazaar Wholesale",
+      description: `Payment for ${profile?.firmName || 'Retailer Account'}`,
+      image: "https://picsum.photos/seed/logo/200/200",
+      handler: function (response: any) {
+        // Successful Payment Logic
+        const paymentId = crypto.randomUUID();
+        const paymentRef = doc(db, "Payments", paymentId);
+        
+        const paymentData = {
+          id: paymentId,
+          userId: masterId,
+          amount: amount,
+          paymentDate: new Date().toISOString(),
+          remarks: `Razorpay: ${response.razorpay_payment_id}`,
+          createdAt: new Date().toISOString(),
+          deleted: false
+        };
+
+        setDocumentNonBlocking(paymentRef, paymentData, { merge: true });
+
+        toast({
+          title: "Payment Successful",
+          description: `Transaction ${response.razorpay_payment_id} recorded in ledger.`,
+        });
+        
+        setPaymentAmount("");
+        setActiveTab("ledger");
+        setIsProcessingPayment(false);
+      },
+      prefill: {
+        name: profile?.firmName || "",
+        contact: profile?.phone || "",
+      },
+      theme: {
+        color: "#000000",
+      },
+      modal: {
+        ondismiss: function() {
+          setIsProcessingPayment(false);
+        }
+      }
+    };
+
+    const paymentObject = new (window as any).Razorpay(options);
+    paymentObject.open();
+  };
 
   const handleDownloadInvoice = (order: any) => {
     if (!profile) return;
@@ -337,6 +421,7 @@ export default function AccountPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8 md:space-y-12">
           <TabsList className="bg-primary p-1 rounded-none h-14 w-full flex overflow-x-auto gap-1 no-scrollbar">
             <TabsTrigger value="overview" className="flex-1 md:flex-none rounded-none px-6 md:px-8 h-full data-[state=active]:bg-accent uppercase font-black text-[9px] md:text-[10px]">Overview</TabsTrigger>
+            <TabsTrigger value="pay" className="flex-1 md:flex-none rounded-none px-6 md:px-8 h-full data-[state=active]:bg-accent uppercase font-black text-[9px] md:text-[10px]">Pay Now</TabsTrigger>
             <TabsTrigger value="ledger" className="flex-1 md:flex-none rounded-none px-6 md:px-8 h-full data-[state=active]:bg-accent uppercase font-black text-[9px] md:text-[10px]">Statement</TabsTrigger>
             <TabsTrigger value="orders" className="flex-1 md:flex-none rounded-none px-6 md:px-8 h-full data-[state=active]:bg-accent uppercase font-black text-[9px] md:text-[10px]">Orders</TabsTrigger>
           </TabsList>
@@ -364,6 +449,48 @@ export default function AccountPage() {
               <div className="space-y-2">
                 <div className="text-[10px] font-black uppercase opacity-40">Total Payments (Credits)</div>
                 <div className="text-2xl md:text-3xl font-black text-green-600">₹{formatCurrency(totalCredits)}</div>
+              </div>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="pay" className="max-w-xl mx-auto">
+            <Card className="rounded-none border-none shadow-2xl bg-white p-8 md:p-12">
+              <CardHeader className="text-center p-0 mb-10">
+                <Zap className="h-12 w-12 text-accent mx-auto mb-4" />
+                <CardTitle className="text-2xl font-black uppercase tracking-tighter">Fast Repayment</CardTitle>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mt-2">Clear your outstanding via Razorpay</p>
+              </CardHeader>
+              <div className="space-y-8">
+                <div className="bg-primary/5 p-6 space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Current Outstanding</span>
+                  <div className="text-2xl font-black text-primary">₹{formatCurrency(currentOutstanding)}</div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-black uppercase tracking-widest">Enter Payment Amount (INR)</Label>
+                  <Input 
+                    type="number" 
+                    placeholder="0.00"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    className="h-16 rounded-none text-xl font-black border-primary/10 focus:border-accent transition-colors"
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <Button 
+                    onClick={handlePayNow}
+                    disabled={isProcessingPayment || !paymentAmount || parseFloat(paymentAmount) <= 0}
+                    className="w-full h-16 bg-primary text-background hover:bg-accent rounded-none uppercase font-black text-[10px] tracking-[0.4em]"
+                  >
+                    {isProcessingPayment ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <CreditCard className="h-5 w-5 mr-3" />}
+                    Initialize Razorpay Secure
+                  </Button>
+                  <div className="flex items-center justify-center gap-3 opacity-30">
+                    <ShieldCheck className="h-3 w-3" />
+                    <span className="text-[8px] font-black uppercase tracking-widest">PCI-DSS Compliant Infrastructure</span>
+                  </div>
+                </div>
               </div>
             </Card>
           </TabsContent>
@@ -572,3 +699,4 @@ export default function AccountPage() {
     </div>
   );
 }
+
