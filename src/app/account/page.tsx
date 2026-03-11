@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -26,7 +25,7 @@ import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@
 import { collection, query, where, doc } from "firebase/firestore";
 import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { cn } from "@/lib/utils";
-import jsPDF from "jsPDF";
+import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
