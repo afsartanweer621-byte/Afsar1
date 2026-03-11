@@ -2,7 +2,23 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { Bell, ShoppingCart, User, LogIn, LogOut, Trash2, LayoutDashboard, Fingerprint, Loader2 } from "lucide-react";
+import { 
+  Bell, 
+  ShoppingCart, 
+  User, 
+  LogIn, 
+  LogOut, 
+  Trash2, 
+  LayoutDashboard, 
+  Fingerprint, 
+  Loader2,
+  Plus,
+  Minus,
+  AlertCircle,
+  CreditCard,
+  ChevronRight,
+  ShieldCheck
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -29,6 +45,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { doc, collection, query, orderBy, where } from "firebase/firestore";
 import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { cn } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
 
 export function Navbar() {
   const { user } = useUser();
@@ -37,7 +54,7 @@ export function Navbar() {
   const { toast } = useToast();
   const router = useRouter();
   const pathname = usePathname();
-  const { items, removeFromCart, cartCount, cartTotal, clearCart } = useCart();
+  const { items, removeFromCart, updateQuantity, cartCount, cartTotal, clearCart } = useCart();
   const [mounted, setMounted] = useState(false);
   const [isAdminAuthorized, setIsAdminAuthorized] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -89,7 +106,6 @@ export function Navbar() {
     const openingBalance = parseAmount(sessionProfile.openingBalance);
     const creditLimit = parseAmount(sessionProfile.creditLimit);
 
-    // Outstanding = (Approved Orders + Opening Debits) - (Payments + Opening Credits)
     const totalDebits = approvedOrdersTotal + (openingBalance < 0 ? Math.abs(openingBalance) : 0);
     const totalCredits = paymentsTotal + (openingBalance > 0 ? openingBalance : 0);
     const currentOutstanding = totalDebits - totalCredits;
@@ -300,53 +316,135 @@ export function Navbar() {
                     )}
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-[80vw] sm:w-[25vw] sm:max-w-[25vw] flex flex-col p-0 rounded-none shadow-2xl border-l border-primary/10">
-                  <SheetHeader className="p-6 md:p-8 border-b border-primary/10">
-                    <SheetTitle className="text-2xl md:text-3xl font-black uppercase tracking-tighter">Wholesale Cart</SheetTitle>
-                    <SheetDescription className="text-[9px] font-black uppercase text-accent tracking-widest">Review Registry Order</SheetDescription>
+                <SheetContent side="right" className="w-[100vw] sm:w-[450px] flex flex-col p-0 rounded-none shadow-2xl border-l border-primary/10 transition-all duration-500">
+                  <SheetHeader className="p-6 md:p-8 border-b border-primary/5 bg-primary/5">
+                    <div className="flex justify-between items-center">
+                      <div className="space-y-1">
+                        <SheetTitle className="text-2xl md:text-3xl font-black uppercase tracking-tighter">Wholesale Cart</SheetTitle>
+                        <SheetDescription className="text-[9px] font-black uppercase text-accent tracking-widest">Review Partner Procurement</SheetDescription>
+                      </div>
+                      {cartCount > 0 && (
+                        <Button variant="ghost" size="sm" onClick={clearCart} className="text-[8px] font-black uppercase opacity-40 hover:opacity-100 hover:bg-red-50 hover:text-red-600 transition-all">
+                          <Trash2 className="h-3 w-3 mr-1" /> Clear All
+                        </Button>
+                      )}
+                    </div>
                   </SheetHeader>
+
                   <ScrollArea className="flex-grow">
-                    <div className="p-6 md:p-8 space-y-4">
+                    <div className="p-6 md:p-8 space-y-6">
                       {items.map((item) => (
-                        <div key={item.id} className="flex flex-col gap-3 py-4 border-b border-primary/5 last:border-none">
-                          <div className="flex justify-between items-start gap-4">
-                            <div className="space-y-1 flex-1">
-                              <h4 className="text-base md:text-lg font-black uppercase leading-tight tracking-tight text-primary">{item.name}</h4>
-                              <p className="text-[8px] font-black text-primary/40 uppercase tracking-widest bg-primary/5 inline-block px-1.5 py-0.5">SKU: {item.id}</p>
+                        <div key={item.id} className="group relative flex flex-col bg-white border border-primary/5 p-4 rounded-none shadow-sm hover:shadow-md hover:border-primary/10 transition-all">
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="space-y-1">
+                              <h4 className="text-sm md:text-base font-black uppercase leading-tight tracking-tight text-primary group-hover:text-accent transition-colors">{item.name}</h4>
+                              <p className="text-[8px] font-black text-primary/40 uppercase tracking-widest flex items-center gap-2">
+                                <span className="bg-primary/5 px-1.5 py-0.5">SKU: {item.id}</span>
+                                <span className="text-accent/60">{item.category}</span>
+                              </p>
                             </div>
-                            <Button variant="ghost" size="icon" onClick={() => removeFromCart(item.id)} className="h-7 w-7 text-destructive hover:bg-destructive/5 shrink-0"><Trash2 className="h-4 w-4" /></Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => removeFromCart(item.id)} 
+                              className="h-8 w-8 text-primary/20 hover:text-red-600 hover:bg-red-50 rounded-none transition-colors"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
-                          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest bg-secondary/5 p-3 border border-primary/5">
-                            <div className="flex items-center gap-2"><span className="opacity-40">Qty:</span><span className="text-primary">{item.quantity} UNITS</span></div>
-                            <div className="flex items-center gap-2"><span className="opacity-40">Total:</span><span className="text-primary">₹{(item.price * item.quantity).toLocaleString('en-IN')}</span></div>
+
+                          <div className="flex items-center justify-between pt-4 border-t border-primary/5">
+                            <div className="flex items-center bg-primary/5 rounded-none p-1 border border-primary/5">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => updateQuantity(item.id, Math.max(4, item.quantity - 4))}
+                                className="h-7 w-7 text-primary/40 hover:text-primary hover:bg-white transition-all rounded-none"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                              <span className="w-10 text-center text-[10px] font-black text-primary">{item.quantity}</span>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => updateQuantity(item.id, item.quantity + 4)}
+                                className="h-7 w-7 text-primary/40 hover:text-primary hover:bg-white transition-all rounded-none"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-[8px] font-black uppercase opacity-40 leading-none mb-1">Subtotal</div>
+                              <div className="text-sm font-black text-primary">₹{(item.price * item.quantity).toLocaleString('en-IN')}</div>
+                            </div>
                           </div>
                         </div>
                       ))}
+
                       {items.length === 0 && (
-                        <div className="h-full flex flex-col items-center justify-center py-20 text-center opacity-20">
-                          <ShoppingCart className="h-12 w-12 mb-4" />
-                          <p className="text-[10px] font-black uppercase tracking-[0.3em]">Registry Empty</p>
+                        <div className="h-[50vh] flex flex-col items-center justify-center text-center space-y-6 opacity-30">
+                          <div className="bg-primary/5 p-8 rounded-full">
+                            <ShoppingCart className="h-16 w-16" />
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-[10px] font-black uppercase tracking-[0.4em]">Registry Empty</p>
+                            <p className="text-[8px] font-bold uppercase max-w-[200px] leading-relaxed">Your procurement list is currently void. Browse the catalog to add items.</p>
+                          </div>
+                          <Link href="/catalog">
+                            <Button className="h-12 px-8 bg-primary text-background rounded-none uppercase font-black text-[9px] tracking-widest gap-2">
+                              Browse Catalog <ChevronRight className="h-3 w-3" />
+                            </Button>
+                          </Link>
                         </div>
                       )}
                     </div>
                   </ScrollArea>
+
                   {items.length > 0 && (
-                    <div className="p-6 md:p-8 border-t border-primary/10 bg-white space-y-6">
+                    <div className="p-6 md:p-8 border-t border-primary/10 bg-white shadow-[0_-10px_40px_rgba(0,0,0,0.05)] space-y-6">
+                      {/* Credit Status Card */}
+                      {creditInfo && (
+                        <div className="bg-primary/5 border border-primary/5 p-4 rounded-none space-y-3">
+                          <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
+                            <span className="flex items-center gap-2"><CreditCard className="h-3 w-3 text-accent" /> Available Credit</span>
+                            <span className={cn(creditInfo.availableCredit < cartTotal ? "text-red-600" : "text-green-600")}>
+                              ₹{creditInfo.availableCredit.toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                          <Progress 
+                            value={Math.min(100, (cartTotal / creditInfo.availableCredit) * 100)} 
+                            className="h-1.5 bg-primary/10" 
+                          />
+                          {excessAmount > 0 && (
+                            <div className="flex items-center gap-2 text-[8px] font-bold text-red-600 uppercase animate-pulse">
+                              <AlertCircle className="h-3 w-3" />
+                              Limit Exceeded by ₹{excessAmount.toLocaleString()}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       <div className="space-y-4">
-                        <div className="flex justify-between items-end border-b border-primary/10 pb-4">
+                        <div className="flex justify-between items-end border-b border-primary/5 pb-4">
                           <div className="space-y-1">
                             <span className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Grand Order Total</span>
-                            <div className="text-[8px] font-bold text-accent uppercase tracking-widest">Incl. 5% GST & Duties</div>
+                            <div className="text-[8px] font-bold text-accent uppercase tracking-widest flex items-center gap-1">
+                              <ShieldCheck className="h-3 w-3" /> Incl. 5% GST & Duties
+                            </div>
                           </div>
-                          <p className="text-xl md:text-2xl font-black tracking-tighter">₹{cartTotal.toLocaleString('en-IN')}</p>
+                          <div className="text-right">
+                            <p className="text-2xl md:text-3xl font-black tracking-tighter text-primary">₹{cartTotal.toLocaleString('en-IN')}</p>
+                          </div>
                         </div>
                         
                         {excessAmount > 0 && (
-                          <div className="p-4 bg-red-50 border border-red-100 space-y-2">
-                            <p className="text-[9px] font-black uppercase text-red-600">Credit Limit Exceeded</p>
-                            <div className="flex justify-between items-center text-[10px] font-bold">
-                              <span className="opacity-60">Excess to Pay:</span>
-                              <span className="text-red-700">₹{excessAmount.toLocaleString('en-IN')}</span>
+                          <div className="p-4 bg-red-50 border-l-4 border-red-600 space-y-3">
+                            <div className="flex justify-between items-start">
+                              <div className="space-y-1">
+                                <p className="text-[9px] font-black uppercase text-red-600">Action Required</p>
+                                <p className="text-[8px] font-medium uppercase opacity-60 leading-tight">Pay excess amount to finalize order immediately.</p>
+                              </div>
+                              <span className="text-xs font-black text-red-700">₹{excessAmount.toLocaleString('en-IN')}</span>
                             </div>
                           </div>
                         )}
@@ -355,14 +453,27 @@ export function Navbar() {
                       <Button 
                         onClick={handleCheckout} 
                         disabled={isProcessingPayment}
-                        className="w-full h-14 bg-primary text-background hover:bg-accent transition-all rounded-none uppercase font-black text-[10px] tracking-[0.3em]"
+                        className={cn(
+                          "w-full h-16 transition-all duration-300 rounded-none uppercase font-black text-[10px] tracking-[0.3em] shadow-xl hover:shadow-2xl",
+                          excessAmount > 0 ? "bg-accent text-white hover:bg-accent/90" : "bg-primary text-background hover:bg-primary/90"
+                        )}
                       >
                         {isProcessingPayment ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <div className="flex items-center gap-3">
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                            <span>PROCESSING...</span>
+                          </div>
                         ) : (
-                          excessAmount > 0 ? `Pay Excess (₹${excessAmount.toLocaleString()}) & Submit` : "Finalize Sourcing Order"
+                          <div className="flex items-center justify-center gap-3">
+                            <span>{excessAmount > 0 ? `PAY EXCESS & SUBMIT` : "FINALIZE SOURCING ORDER"}</span>
+                            <ChevronRight className="h-4 w-4" />
+                          </div>
                         )}
                       </Button>
+                      
+                      <p className="text-[7px] font-black text-center uppercase tracking-widest opacity-30">
+                        Secure B2B Transaction • Real-time Inventory Lock
+                      </p>
                     </div>
                   )}
                 </SheetContent>
