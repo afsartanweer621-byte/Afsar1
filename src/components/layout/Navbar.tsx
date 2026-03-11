@@ -143,7 +143,7 @@ export function Navbar() {
     }
   };
 
-  const finalizeOrder = (paymentId?: string) => {
+  const finalizeOrder = (paymentId?: string, amountPaid?: number) => {
     if (!user || !sessionProfile) return;
     
     setIsProcessingPayment(true);
@@ -151,6 +151,7 @@ export function Navbar() {
     const orderRef = doc(db, "Orders", orderId);
     
     const masterId = sessionProfile?.originalRequestId || user.uid;
+    const finalAmountPaid = amountPaid || 0;
     
     const orderData = {
       id: orderId,
@@ -158,20 +159,23 @@ export function Navbar() {
       items: items.map(i => ({ ...i, discount: 0 })),
       totalAmount: cartTotal,
       status: "Processing",
+      paymentId: paymentId || null,
+      paidAmount: finalAmountPaid,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 
+    // Initiation of write without await as per guidelines
     setDocumentNonBlocking(orderRef, orderData, { merge: true });
 
-    if (paymentId) {
+    if (paymentId && finalAmountPaid > 0) {
       const pRef = doc(collection(db, "Payments"));
       setDocumentNonBlocking(pRef, {
         id: pRef.id,
         userId: masterId,
-        amount: excessAmount,
+        amount: finalAmountPaid,
         paymentDate: new Date().toISOString(),
-        remarks: `Excess Amount Payment (Razorpay: ${paymentId})`,
+        remarks: `Excess Payment (Order: ${orderId.slice(0,8)}, Razorpay: ${paymentId})`,
         createdAt: new Date().toISOString()
       }, { merge: true });
     }
@@ -179,7 +183,7 @@ export function Navbar() {
     toast({
       title: "Order Submitted",
       description: paymentId 
-        ? `Payment of ₹${excessAmount.toLocaleString()} verified. Order placed.` 
+        ? `Payment of ₹${finalAmountPaid.toLocaleString()} verified. Sourcing order finalized.` 
         : "Order sent for logistics verification.",
     });
     
@@ -196,14 +200,15 @@ export function Navbar() {
 
     if (excessAmount > 0) {
       setIsProcessingPayment(true);
+      const currentExcess = excessAmount;
       const options = {
         key: "rzp_live_SPD2FHOlvuoCjl",
-        amount: Math.round(excessAmount * 100),
+        amount: Math.round(currentExcess * 100),
         currency: "INR",
         name: "Mochibazaar",
         description: `Excess Payment for Order (${items.length} Articles)`,
-        handler: function (response: any) {
-          finalizeOrder(response.razorpay_payment_id);
+        handler: (response: any) => {
+          finalizeOrder(response.razorpay_payment_id, currentExcess);
         },
         prefill: {
           name: sessionProfile.firmName,
@@ -211,7 +216,7 @@ export function Navbar() {
         },
         theme: { color: "#000000" },
         modal: {
-          ondismiss: function () {
+          ondismiss: () => {
             setIsProcessingPayment(false);
           }
         }
@@ -419,7 +424,7 @@ export function Navbar() {
                             </span>
                           </div>
                           <Progress 
-                            value={Math.min(100, (cartTotal / creditInfo.availableCredit) * 100)} 
+                            value={Math.min(100, (cartTotal / Math.max(1, creditInfo.availableCredit)) * 100)} 
                             className="h-1.5 bg-primary/10" 
                           />
                           {excessAmount > 0 && (
