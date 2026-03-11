@@ -19,7 +19,8 @@ import {
   ChevronRight,
   ShieldCheck,
   Package,
-  ArrowLeft
+  ArrowLeft,
+  XCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -103,6 +104,11 @@ export function Navbar() {
       
     const paymentsTotal = userPayments
       ?.filter(p => !p.deleted)
+      .filter(p => {
+        const isDigital = p.remarks?.toLowerCase().includes("direct portal") || p.remarks?.toLowerCase().includes("excess payment");
+        if (isDigital) return !!p.razorpayPaymentId;
+        return true;
+      })
       .reduce((acc, curr) => acc + parseAmount(curr.amount), 0) || 0;
 
     const openingBalance = parseAmount(sessionProfile.openingBalance);
@@ -325,20 +331,32 @@ export function Navbar() {
                 </SheetTrigger>
                 <SheetContent side="right" className="w-[100vw] sm:w-[480px] flex flex-col p-0 rounded-none shadow-2xl border-l border-primary/10">
                   <SheetHeader className="p-6 md:p-8 border-b border-primary/5 bg-primary/5">
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-start">
                       <div className="space-y-1">
                         <SheetTitle className="text-2xl md:text-3xl font-black uppercase tracking-tighter">Wholesale Cart</SheetTitle>
                         <SheetDescription className="text-[9px] font-black uppercase text-accent tracking-widest">Review Partner Procurement</SheetDescription>
                       </div>
-                      <SheetClose asChild>
-                        <Button variant="ghost" size="sm" className="text-[8px] font-black uppercase opacity-40 hover:opacity-100 flex items-center gap-1">
-                          <ArrowLeft className="h-3 w-3" /> Back
-                        </Button>
-                      </SheetClose>
+                      <div className="flex flex-col items-end gap-2">
+                        <SheetClose asChild>
+                          <Button variant="ghost" size="sm" className="text-[8px] font-black uppercase opacity-40 hover:opacity-100 flex items-center gap-1">
+                            <ArrowLeft className="h-3 w-3" /> Back
+                          </Button>
+                        </SheetClose>
+                        {items.length > 0 && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={clearCart}
+                            className="text-[8px] font-black uppercase text-destructive hover:bg-destructive/5 gap-1 h-7 px-2 border border-destructive/10"
+                          >
+                            <XCircle className="h-3 w-3" /> Clear All
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </SheetHeader>
 
-                  <ScrollArea className="flex-grow">
+                  <ScrollArea className="flex-grow min-h-0">
                     <div className="p-6 md:p-8 space-y-6">
                       {items.map((item) => (
                         <div key={item.id} className="group flex bg-white border border-primary/5 p-4 rounded-none shadow-sm hover:shadow-md transition-all gap-4">
@@ -418,7 +436,7 @@ export function Navbar() {
                   </ScrollArea>
 
                   {items.length > 0 && (
-                    <div className="p-6 md:p-8 border-t border-primary/10 bg-white shadow-[0_-10px_40px_rgba(0,0,0,0.05)] space-y-6">
+                    <div className="p-6 md:p-8 border-t border-primary/10 bg-white shadow-[0_-10px_40px_rgba(0,0,0,0.05)] space-y-6 shrink-0">
                       {creditInfo && (
                         <div className="bg-primary/5 border border-primary/5 p-4 rounded-none space-y-3">
                           <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
