@@ -46,7 +46,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useRouter, usePathname } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { doc, collection, query, orderBy, where } from "firebase/firestore";
+import { doc, collection, query, orderBy, where, setDoc } from "firebase/firestore";
 import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
@@ -151,7 +151,7 @@ export function Navbar() {
     }
   };
 
-  const finalizeOrder = (paymentId?: string, amountPaid?: number) => {
+  const finalizeOrder = async (paymentId?: string, amountPaid?: number) => {
     if (!user || !sessionProfile) return;
     
     setIsProcessingPayment(true);
@@ -163,43 +163,50 @@ export function Navbar() {
     const itemsSnapshot = [...items];
     const totalSnapshot = cartTotal;
     
-    const orderData = {
-      id: orderId,
-      userId: masterIdSnapshot,
-      items: itemsSnapshot.map(i => ({ ...i, discount: 0 })),
-      totalAmount: totalSnapshot,
-      status: "Processing",
-      paymentId: paymentId || null,
-      paidAmount: finalAmountPaid,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    setDocumentNonBlocking(orderRef, orderData, { merge: true });
-
-    if (paymentId && finalAmountPaid > 0) {
-      const pRef = doc(collection(db, "Payments"));
-      setDocumentNonBlocking(pRef, {
-        id: pRef.id,
+    try {
+      const orderData = {
+        id: orderId,
         userId: masterIdSnapshot,
-        amount: finalAmountPaid,
-        paymentDate: new Date().toISOString(),
-        remarks: `Excess Payment (Order: ${orderId.slice(0,8)}, Razorpay: ${paymentId})`,
+        items: itemsSnapshot.map(i => ({ ...i, discount: 0 })),
+        totalAmount: totalSnapshot,
+        status: "Processing",
+        paymentId: paymentId || null,
+        paidAmount: finalAmountPaid,
         createdAt: new Date().toISOString(),
-        razorpayPaymentId: paymentId
-      }, { merge: true });
-    }
+        updatedAt: new Date().toISOString()
+      };
 
-    toast({
-      title: "Order Submitted",
-      description: paymentId 
-        ? `Payment of ₹${finalAmountPaid.toLocaleString()} verified. Sourcing order finalized.` 
-        : "Order sent for logistics verification.",
-    });
-    
-    clearCart();
-    setIsProcessingPayment(false);
-    router.push("/account");
+      await setDoc(orderRef, orderData, { merge: true });
+
+      if (paymentId && finalAmountPaid > 0) {
+        const pId = crypto.randomUUID();
+        const pRef = doc(db, "Payments", pId);
+        await setDoc(pRef, {
+          id: pId,
+          userId: masterIdSnapshot,
+          amount: finalAmountPaid,
+          paymentDate: new Date().toISOString(),
+          remarks: `Excess Payment (Order: ${orderId.slice(0,8)}, Razorpay: ${paymentId})`,
+          createdAt: new Date().toISOString(),
+          razorpayPaymentId: paymentId
+        }, { merge: true });
+      }
+
+      toast({
+        title: "Order Submitted",
+        description: paymentId 
+          ? `Payment of ₹${finalAmountPaid.toLocaleString()} verified. Sourcing order finalized.` 
+          : "Order sent for logistics verification.",
+      });
+      
+      clearCart();
+      router.push("/account");
+    } catch (error) {
+      console.error("Submission error:", error);
+      toast({ variant: "destructive", title: "Submission Failed", description: "Could not finalize order. Please contact support." });
+    } finally {
+      setIsProcessingPayment(false);
+    }
   };
 
   const handleCheckout = () => {
@@ -358,91 +365,93 @@ export function Navbar() {
                     </div>
                   </SheetHeader>
 
-                  <ScrollArea className="flex-grow bg-background">
-                    <div className="p-4 space-y-3">
-                      {items.map((item) => (
-                        <div key={item.id} className="group flex bg-white border border-primary/5 p-2 rounded-none shadow-sm hover:shadow-md transition-all gap-3">
-                          <div className="relative h-14 w-14 bg-primary/5 shrink-0 border border-primary/5">
-                            {item.imageUrl ? (
-                              <Image src={item.imageUrl} alt={item.name} fill className="object-cover" />
-                            ) : (
-                              <div className="h-full w-full flex items-center justify-center opacity-10">
-                                <Package className="h-5 w-5" />
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div className="flex-grow flex flex-col justify-between">
-                            <div className="flex justify-between items-start">
-                              <div className="space-y-0.5">
-                                <h4 className="text-[10px] font-black uppercase leading-tight tracking-tight text-primary truncate max-w-[180px]">{item.name}</h4>
-                                <p className="text-[7px] font-black text-primary/40 uppercase tracking-widest">
-                                  ID: {item.id} • {item.category}
-                                </p>
-                              </div>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => removeFromCart(item.id)} 
-                                className="h-5 w-5 text-primary/20 hover:text-red-600 transition-colors"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                  <div className="flex-grow flex flex-col min-h-0 bg-background">
+                    <ScrollArea className="flex-grow">
+                      <div className="p-4 space-y-2">
+                        {items.map((item) => (
+                          <div key={item.id} className="group flex bg-white border border-primary/5 p-2 rounded-none shadow-sm hover:shadow-md transition-all gap-3">
+                            <div className="relative h-14 w-14 bg-primary/5 shrink-0 border border-primary/5">
+                              {item.imageUrl ? (
+                                <Image src={item.imageUrl} alt={item.name} fill className="object-cover" />
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center opacity-10">
+                                  <Package className="h-5 w-5" />
+                                </div>
+                              )}
                             </div>
-
-                            <div className="flex items-center justify-between pt-1">
-                              <div className="flex items-center bg-primary/5 rounded-none p-0.5 border border-primary/5">
+                            
+                            <div className="flex-grow flex flex-col justify-between">
+                              <div className="flex justify-between items-start">
+                                <div className="space-y-0.5">
+                                  <h4 className="text-[10px] font-black uppercase leading-tight tracking-tight text-primary truncate max-w-[180px]">{item.name}</h4>
+                                  <p className="text-[7px] font-black text-primary/40 uppercase tracking-widest">
+                                    ID: {item.id} • {item.category}
+                                  </p>
+                                </div>
                                 <Button 
                                   variant="ghost" 
                                   size="icon" 
-                                  onClick={() => updateQuantity(item.id, Math.max(4, item.quantity - 4))}
-                                  className="h-5 w-5 text-primary/40 hover:text-primary rounded-none"
+                                  onClick={() => removeFromCart(item.id)} 
+                                  className="h-5 w-5 text-primary/20 hover:text-red-600 transition-colors"
                                 >
-                                  <Minus className="h-2.5 w-2.5" />
-                                </Button>
-                                <span className="w-6 text-center text-[9px] font-black text-primary">{item.quantity}</span>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  onClick={() => updateQuantity(item.id, item.quantity + 4)}
-                                  className="h-5 w-5 text-primary/40 hover:text-primary rounded-none"
-                                >
-                                  <Plus className="h-2.5 w-2.5" />
+                                  <Trash2 className="h-3 w-3" />
                                 </Button>
                               </div>
-                              <div className="text-right">
-                                <div className="text-[10px] font-black text-primary">₹{(item.price * item.quantity).toLocaleString('en-IN')}</div>
-                                <div className="text-[6px] opacity-40 font-bold leading-none">@ ₹{item.price.toLocaleString()}</div>
+
+                              <div className="flex items-center justify-between pt-1">
+                                <div className="flex items-center bg-primary/5 rounded-none p-0.5 border border-primary/5">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    onClick={() => updateQuantity(item.id, Math.max(4, item.quantity - 4))}
+                                    className="h-5 w-5 text-primary/40 hover:text-primary rounded-none"
+                                  >
+                                    <Minus className="h-2.5 w-2.5" />
+                                  </Button>
+                                  <span className="w-6 text-center text-[9px] font-black text-primary">{item.quantity}</span>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    onClick={() => updateQuantity(item.id, item.quantity + 4)}
+                                    className="h-5 w-5 text-primary/40 hover:text-primary rounded-none"
+                                  >
+                                    <Plus className="h-2.5 w-2.5" />
+                                  </Button>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-[10px] font-black text-primary">₹{(item.price * item.quantity).toLocaleString('en-IN')}</div>
+                                  <div className="text-[6px] opacity-40 font-bold leading-none">@ ₹{item.price.toLocaleString()}</div>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
 
-                      {items.length === 0 && (
-                        <div className="h-[40vh] flex flex-col items-center justify-center text-center space-y-4 opacity-30">
-                          <div className="bg-primary/5 p-6 rounded-full">
-                            <ShoppingCart className="h-12 w-12" />
+                        {items.length === 0 && (
+                          <div className="h-[40vh] flex flex-col items-center justify-center text-center space-y-4 opacity-30">
+                            <div className="bg-primary/5 p-6 rounded-full">
+                              <ShoppingCart className="h-12 w-12" />
+                            </div>
+                            <p className="text-[9px] font-black uppercase tracking-[0.4em]">Cart Empty</p>
+                            <SheetClose asChild>
+                              <Link href="/catalog">
+                                <Button className="h-10 px-6 bg-primary text-background rounded-none uppercase font-black text-[8px] tracking-widest gap-2">
+                                  Browse Catalog <ChevronRight className="h-3 w-3" />
+                                </Button>
+                              </Link>
+                            </SheetClose>
                           </div>
-                          <p className="text-[9px] font-black uppercase tracking-[0.4em]">Cart Empty</p>
-                          <SheetClose asChild>
-                            <Link href="/catalog">
-                              <Button className="h-10 px-6 bg-primary text-background rounded-none uppercase font-black text-[8px] tracking-widest gap-2">
-                                Browse Catalog <ChevronRight className="h-3 w-3" />
-                              </Button>
-                            </Link>
-                          </SheetClose>
-                        </div>
-                      )}
-                    </div>
-                  </ScrollArea>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </div>
 
                   {items.length > 0 && (
-                    <div className="p-4 border-t border-primary/10 bg-white shadow-[0_-10px_40px_rgba(0,0,0,0.05)] space-y-2 shrink-0">
+                    <div className="p-3 border-t border-primary/10 bg-white shadow-[0_-10px_40px_rgba(0,0,0,0.05)] space-y-2 shrink-0">
                       {creditInfo && (
-                        <div className="bg-primary/5 border border-primary/5 p-2 rounded-none space-y-1">
+                        <div className="space-y-1">
                           <div className="flex justify-between items-center text-[8px] font-black uppercase tracking-widest">
-                            <span className="flex items-center gap-1"><CreditCard className="h-2 w-2 text-accent" /> Available Credit</span>
+                            <span className="flex items-center gap-1"><CreditCard className="h-2 w-2 text-accent" /> Avl. Credit</span>
                             <span className={cn(creditInfo.availableCredit < cartTotal ? "text-red-600" : "text-green-600")}>
                               ₹{creditInfo.availableCredit.toLocaleString('en-IN')}
                             </span>
@@ -454,24 +463,22 @@ export function Navbar() {
                         </div>
                       )}
 
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between items-center">
-                          <div className="flex flex-col">
-                            <span className="text-[8px] font-black uppercase tracking-widest opacity-40">Grand Order Total</span>
-                            <div className="text-[7px] font-bold text-accent uppercase flex items-center gap-1">
-                              <ShieldCheck className="h-2 w-2" /> Incl. 5% GST
-                            </div>
+                      <div className="flex justify-between items-end">
+                        <div className="flex flex-col">
+                          <span className="text-[8px] font-black uppercase opacity-40 leading-none">Grand Order Total</span>
+                          <div className="text-[7px] font-bold text-accent uppercase flex items-center gap-1">
+                            <ShieldCheck className="h-2 w-2" /> Incl. 5% GST
                           </div>
-                          <p className="text-xl font-black tracking-tighter text-primary">₹{cartTotal.toLocaleString('en-IN')}</p>
                         </div>
-                        
-                        {excessAmount > 0 && (
-                          <div className="px-2 py-1 bg-red-50 border-l-2 border-red-600 flex justify-between items-center animate-pulse">
-                            <p className="text-[8px] font-black uppercase text-red-600">Pay Excess to Finalize</p>
-                            <span className="text-[9px] font-black text-red-700">₹{excessAmount.toLocaleString('en-IN')}</span>
-                          </div>
-                        )}
+                        <p className="text-xl font-black tracking-tighter text-primary leading-none">₹{cartTotal.toLocaleString('en-IN')}</p>
                       </div>
+                      
+                      {excessAmount > 0 && (
+                        <div className="px-2 py-1.5 bg-red-50 border-l-2 border-red-600 flex justify-between items-center animate-pulse">
+                          <p className="text-[8px] font-black uppercase text-red-600">Action: Pay Excess</p>
+                          <span className="text-[9px] font-black text-red-700">₹{excessAmount.toLocaleString('en-IN')}</span>
+                        </div>
+                      )}
 
                       <Button 
                         onClick={handleCheckout} 
@@ -492,7 +499,7 @@ export function Navbar() {
                       </Button>
                       
                       <p className="text-[6px] font-black text-center uppercase tracking-widest opacity-20">
-                        Secure B2B Transaction • Real-time Lock
+                        Secure B2B Transaction • Real-time Sync
                       </p>
                     </div>
                   )}

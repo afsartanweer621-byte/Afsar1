@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -188,40 +189,40 @@ export default function AccountPage() {
 
   const handleDownloadInvoice = (order: any) => {
     if (!profile) return;
-    const doc = new jsPDF();
+    const pdfDoc = new jsPDF();
     const firmName = profile.firmName || "Verified Retailer";
     const gstNo = profile.gst || "N/A";
     const isInterState = !gstNo.startsWith("20");
 
-    doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.text("ZEON CORPORATION", 105, 15, { align: "center" });
+    pdfDoc.setFontSize(18);
+    pdfDoc.setFont("helvetica", "bold");
+    pdfDoc.text("ZEON CORPORATION", 105, 15, { align: "center" });
     
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.text("Mahendra Arcade LGF 1 and LGF 2, opp kashmir Vastralaya, Main Road, Ranchi", 105, 22, { align: "center" });
-    doc.text("Ranchi, Jharkhand, 834001", 105, 27, { align: "center" });
-    doc.text("GSTIN: 20AYOPT9324L1ZV", 105, 32, { align: "center" });
+    pdfDoc.setFontSize(9);
+    pdfDoc.setFont("helvetica", "normal");
+    pdfDoc.text("Mahendra Arcade LGF 1 and LGF 2, opp kashmir Vastralaya, Main Road, Ranchi", 105, 22, { align: "center" });
+    pdfDoc.text("Ranchi, Jharkhand, 834001", 105, 27, { align: "center" });
+    pdfDoc.text("GSTIN: 20AYOPT9324L1ZV", 105, 32, { align: "center" });
     
-    doc.setDrawColor(0);
-    doc.line(20, 36, 190, 36);
+    pdfDoc.setDrawColor(0);
+    pdfDoc.line(20, 36, 190, 36);
 
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("TAX INVOICE", 105, 45, { align: "center" });
+    pdfDoc.setFontSize(14);
+    pdfDoc.setFont("helvetica", "bold");
+    pdfDoc.text("TAX INVOICE", 105, 45, { align: "center" });
 
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text("Invoice To:", 20, 55);
-    doc.setFont("helvetica", "normal");
-    doc.text(firmName, 20, 60);
-    doc.text(`GST: ${gstNo}`, 20, 65);
+    pdfDoc.setFontSize(10);
+    pdfDoc.setFont("helvetica", "bold");
+    pdfDoc.text("Invoice To:", 20, 55);
+    pdfDoc.setFont("helvetica", "normal");
+    pdfDoc.text(firmName, 20, 60);
+    pdfDoc.text(`GST: ${gstNo}`, 20, 65);
     
-    doc.setFont("helvetica", "bold");
-    doc.text(`Invoice #: ${order.id.slice(0, 8).toUpperCase()}`, 190, 55, { align: "right" });
-    doc.setFont("helvetica", "normal");
-    doc.text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`, 190, 60, { align: "right" });
-    doc.text("HSN: 6403", 190, 65, { align: "right" });
+    pdfDoc.setFont("helvetica", "bold");
+    pdfDoc.text(`Invoice #: ${order.id.slice(0, 8).toUpperCase()}`, 190, 55, { align: "right" });
+    pdfDoc.setFont("helvetica", "normal");
+    pdfDoc.text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`, 190, 60, { align: "right" });
+    pdfDoc.text("HSN: 6403", 190, 65, { align: "right" });
 
     const tableData = order.items.map((item: any) => {
       const itemTotal = parseAmount(item.price) * (item.quantity || 1);
@@ -240,7 +241,7 @@ export default function AccountPage() {
       ];
     });
 
-    autoTable(doc, {
+    autoTable(pdfDoc, {
       startY: 75,
       head: [["Description", "HSN", "Qty", "Rate", "Taxable", "GST%", "GST Amt", "Total"]],
       body: tableData,
@@ -249,82 +250,82 @@ export default function AccountPage() {
       styles: { fontSize: 8 }
     });
 
-    const finalY = (doc as any).lastAutoTable.finalY || 100;
+    const finalY = (pdfDoc as any).lastAutoTable.finalY || 100;
     const grandTotal = parseAmount(order.totalAmount);
     const totalTaxable = grandTotal / 1.05;
     const totalTax = grandTotal - totalTaxable;
 
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text(`Total Taxable Value: INR ${totalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 190, finalY + 10, { align: "right" });
+    pdfDoc.setFontSize(10);
+    pdfDoc.setFont("helvetica", "bold");
+    pdfDoc.text(`Total Taxable Value: INR ${totalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 190, finalY + 10, { align: "right" });
     
     if (isInterState) {
-      doc.text(`IGST (5%): INR ${totalTax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 190, finalY + 15, { align: "right" });
+      pdfDoc.text(`IGST (5%): INR ${totalTax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 190, finalY + 15, { align: "right" });
     } else {
-      doc.text(`CGST (2.5%): INR ${(totalTax / 2).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 190, finalY + 15, { align: "right" });
-      doc.text(`SGST (2.5%): INR ${(totalTax / 2).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 190, finalY + 20, { align: "right" });
+      pdfDoc.text(`CGST (2.5%): INR ${(totalTax / 2).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 190, finalY + 15, { align: "right" });
+      pdfDoc.text(`SGST (2.5%): INR ${(totalTax / 2).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 190, finalY + 20, { align: "right" });
     }
 
-    doc.setFontSize(12);
-    doc.text(`GRAND TOTAL (INCL. GST): INR ${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 190, finalY + 30, { align: "right" });
+    pdfDoc.setFontSize(12);
+    pdfDoc.text(`GRAND TOTAL (INCL. GST): INR ${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 190, finalY + 30, { align: "right" });
 
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.text("Terms & Conditions:", 20, finalY + 45);
-    doc.text("1. Goods once sold will not be taken back.", 20, finalY + 50);
-    doc.text("2. 5% GST included as per HSN 6403 Footwear norms.", 20, finalY + 55);
+    pdfDoc.setFontSize(8);
+    pdfDoc.setFont("helvetica", "normal");
+    pdfDoc.text("Terms & Conditions:", 20, finalY + 45);
+    pdfDoc.text("1. Goods once sold will not be taken back.", 20, finalY + 50);
+    pdfDoc.text("2. 5% GST included as per HSN 6403 Footwear norms.", 20, finalY + 55);
 
-    doc.text("Authorized Signatory for ZEON CORPORATION", 190, finalY + 70, { align: "right" });
+    pdfDoc.text("Authorized Signatory for ZEON CORPORATION", 190, finalY + 70, { align: "right" });
 
-    doc.save(`Invoice_${order.id.slice(0, 8)}.pdf`);
+    pdfDoc.save(`Invoice_${order.id.slice(0, 8)}.pdf`);
   };
 
   const handleDownloadPDF = () => {
     if (!profile) return;
-    const doc = new jsPDF();
+    const pdfDoc = new jsPDF();
     const firmName = profile.firmName || "Verified Retailer";
 
-    doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.text("ZEON CORPORATION", 105, 15, { align: "center" });
+    pdfDoc.setFontSize(18);
+    pdfDoc.setFont("helvetica", "bold");
+    pdfDoc.text("ZEON CORPORATION", 105, 15, { align: "center" });
     
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.text("Mahendra Arcade LGF 1 and LGF 2, opp kashmir Vastralaya, Main Road, Ranchi", 105, 22, { align: "center" });
-    doc.text("Ranchi, Jharkhand, 834001", 105, 27, { align: "center" });
-    doc.text("GSTIN: 20AYOPT9324L1ZV", 105, 32, { align: "center" });
+    pdfDoc.setFontSize(9);
+    pdfDoc.setFont("helvetica", "normal");
+    pdfDoc.text("Mahendra Arcade LGF 1 and LGF 2, opp kashmir Vastralaya, Main Road, Ranchi", 105, 22, { align: "center" });
+    pdfDoc.text("Ranchi, Jharkhand, 834001", 105, 27, { align: "center" });
+    pdfDoc.text("GSTIN: 20AYOPT9324L1ZV", 105, 32, { align: "center" });
     
-    doc.setDrawColor(0);
-    doc.line(20, 36, 190, 36);
+    pdfDoc.setDrawColor(0);
+    pdfDoc.line(20, 36, 190, 36);
 
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("Account Statement", 105, 45, { align: "center" });
+    pdfDoc.setFontSize(14);
+    pdfDoc.setFont("helvetica", "bold");
+    pdfDoc.text("Account Statement", 105, 45, { align: "center" });
 
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Bill To: ${firmName}`, 20, 55);
-    doc.text(`GST: ${profile.gst || "N/A"}`, 20, 60);
-    doc.text(`Statement Date: ${new Date().toLocaleDateString()}`, 190, 55, { align: "right" });
+    pdfDoc.setFontSize(10);
+    pdfDoc.setFont("helvetica", "normal");
+    pdfDoc.text(`Bill To: ${firmName}`, 20, 55);
+    pdfDoc.text(`GST: ${profile.gst || "N/A"}`, 20, 60);
+    pdfDoc.text(`Statement Date: ${new Date().toLocaleDateString()}`, 190, 55, { align: "right" });
 
-    doc.setDrawColor(230);
-    doc.setFillColor(249, 249, 249);
-    doc.rect(20, 68, 170, 25, "F");
+    pdfDoc.setDrawColor(230);
+    pdfDoc.setFillColor(249, 249, 249);
+    pdfDoc.rect(20, 68, 170, 25, "F");
     
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.text("FINANCIAL SUMMARY", 25, 75);
+    pdfDoc.setFontSize(11);
+    pdfDoc.setFont("helvetica", "bold");
+    pdfDoc.text("FINANCIAL SUMMARY", 25, 75);
     
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Total Debits: INR ${totalDebits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 25, 82);
-    doc.text(`Total Credits: INR ${totalCredits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 25, 88);
+    pdfDoc.setFontSize(10);
+    pdfDoc.setFont("helvetica", "normal");
+    pdfDoc.text(`Total Debits: INR ${totalDebits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 25, 82);
+    pdfDoc.text(`Total Credits: INR ${totalCredits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 25, 88);
     
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(currentOutstanding > 0 ? 180 : 0, 0, 0); 
-    doc.text(`Net Outstanding: INR ${currentOutstanding.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 185, 82, { align: "right" });
-    doc.setTextColor(0, 0, 0);
+    pdfDoc.setFontSize(11);
+    pdfDoc.setFont("helvetica", "bold");
+    pdfDoc.setTextColor(currentOutstanding > 0 ? 180 : 0, 0, 0); 
+    pdfDoc.text(`Net Outstanding: INR ${currentOutstanding.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 185, 82, { align: "right" });
+    pdfDoc.setTextColor(0, 0, 0);
 
     const tableData = [
       [
@@ -343,7 +344,7 @@ export default function AccountPage() {
       ])
     ];
 
-    autoTable(doc, {
+    autoTable(pdfDoc, {
       startY: 100,
       head: [["Date", "Description", "Type", "Amount (INR)"]],
       body: tableData,
@@ -358,7 +359,7 @@ export default function AccountPage() {
       styles: { fontSize: 8 }
     });
 
-    doc.save(`statement_${firmName.replace(/\s+/g, '_')}.pdf`);
+    pdfDoc.save(`statement_${firmName.replace(/\s+/g, '_')}.pdf`);
   };
 
   const handleDownloadOrdersCSV = () => {
