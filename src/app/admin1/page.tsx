@@ -114,7 +114,6 @@ function Admin1Content() {
     return isNaN(num) ? 0 : num;
   };
 
-  // Hardened Payment Filter: Only include confirmed transactions
   const confirmedPayments = useMemo(() => {
     if (!payments) return [];
     return payments.filter(p => {
@@ -341,11 +340,11 @@ function Admin1Content() {
     setDocumentNonBlocking(paymentRef, paymentData, { merge: true });
     setEditingPayment(null);
     setPaymentRetailerSearch("");
-    toast({ title: "Payment Recorded" });
+    toast({ title: editingPayment.id ? "Payment Updated" : "Payment Recorded" });
   };
 
   const handleDeletePayment = (p: any) => {
-    if (!confirm("Delete payment?")) return;
+    if (!confirm("Delete payment? This will update the retailer's outstanding balance immediately.")) return;
     const paymentRef = doc(db, "Payments", p.id);
     updateDocumentNonBlocking(paymentRef, { deleted: true }); 
     toast({ title: "Payment Deleted" });
@@ -562,7 +561,7 @@ function Admin1Content() {
                       <TableHead className="text-background uppercase font-black text-[10px]">Date</TableHead>
                       <TableHead className="text-background uppercase font-black text-[10px]">Retailer</TableHead>
                       <TableHead className="text-background uppercase font-black text-[10px]">Amount</TableHead>
-                      <TableHead className="text-background uppercase font-black text-[10px] text-right">Del</TableHead>
+                      <TableHead className="text-background uppercase font-black text-[10px] text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -573,7 +572,12 @@ function Admin1Content() {
                         <TableCell className="text-[10px] font-bold">{new Date(p.paymentDate).toLocaleDateString()}</TableCell>
                         <TableCell className="text-[10px] font-black uppercase text-accent truncate max-w-[100px]">{getRetailerName(p.userId)}</TableCell>
                         <TableCell className="text-[10px] font-black text-green-600">₹{parseAmount(p.amount).toLocaleString()}</TableCell>
-                        <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => handleDeletePayment(p)} className="h-8 w-8 text-destructive"><Trash2 className="h-3 w-3" /></Button></TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => setEditingPayment(p)} className="h-8 w-8 text-primary/40 hover:text-primary"><Edit className="h-3 w-3" /></Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeletePayment(p)} className="h-8 w-8 text-destructive"><Trash2 className="h-3 w-3" /></Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -654,7 +658,7 @@ function Admin1Content() {
       <Dialog open={!!editingPayment} onOpenChange={() => setEditingPayment(null)}>
         <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto rounded-none bg-background p-6">
           <DialogHeader className="mb-4">
-            <DialogTitle className="text-2xl font-black uppercase">Payment Entry</DialogTitle>
+            <DialogTitle className="text-2xl font-black uppercase">{editingPayment?.id ? 'Edit Payment' : 'Payment Entry'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-6">
             <div className="space-y-2">
@@ -729,7 +733,7 @@ function Admin1Content() {
               disabled={!editingPayment?.userId || !editingPayment?.amount}
               className="w-full h-14 bg-primary text-background rounded-none uppercase font-black text-[10px] tracking-widest disabled:opacity-30"
             >
-              Finalize Payment
+              {editingPayment?.id ? 'Update Record' : 'Finalize Payment'}
             </Button>
           </div>
         </DialogContent>

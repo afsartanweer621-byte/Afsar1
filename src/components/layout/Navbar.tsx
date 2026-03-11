@@ -332,13 +332,13 @@ export function Navbar() {
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="w-[100vw] sm:w-[480px] flex flex-col p-0 rounded-none shadow-2xl border-l border-primary/10 overflow-hidden">
-                  <SheetHeader className="p-4 md:p-6 border-b border-primary/5 bg-primary/5 shrink-0">
+                  <SheetHeader className="p-4 border-b border-primary/5 bg-primary/5 shrink-0">
                     <div className="flex justify-between items-start">
                       <div className="space-y-0.5">
-                        <SheetTitle className="text-xl md:text-2xl font-black uppercase tracking-tighter">Wholesale Cart</SheetTitle>
+                        <SheetTitle className="text-xl font-black uppercase tracking-tighter">Wholesale Cart</SheetTitle>
                         <SheetDescription className="text-[8px] font-black uppercase text-accent tracking-widest">Review Procurement</SheetDescription>
                       </div>
-                      <div className="flex flex-col items-end gap-1.5">
+                      <div className="flex flex-col items-end gap-1">
                         <SheetClose asChild>
                           <Button variant="ghost" size="sm" className="h-6 text-[8px] font-black uppercase opacity-40 hover:opacity-100 flex items-center gap-1">
                             <ArrowLeft className="h-2.5 w-2.5" /> Back
@@ -358,11 +358,11 @@ export function Navbar() {
                     </div>
                   </SheetHeader>
 
-                  <ScrollArea className="flex-grow min-h-0 bg-background">
-                    <div className="p-4 md:p-6 space-y-4">
+                  <ScrollArea className="flex-grow bg-background">
+                    <div className="p-4 space-y-3">
                       {items.map((item) => (
-                        <div key={item.id} className="group flex bg-white border border-primary/5 p-3 rounded-none shadow-sm hover:shadow-md transition-all gap-3">
-                          <div className="relative h-16 w-16 bg-primary/5 shrink-0 border border-primary/5">
+                        <div key={item.id} className="group flex bg-white border border-primary/5 p-2 rounded-none shadow-sm hover:shadow-md transition-all gap-3">
+                          <div className="relative h-14 w-14 bg-primary/5 shrink-0 border border-primary/5">
                             {item.imageUrl ? (
                               <Image src={item.imageUrl} alt={item.name} fill className="object-cover" />
                             ) : (
@@ -375,7 +375,7 @@ export function Navbar() {
                           <div className="flex-grow flex flex-col justify-between">
                             <div className="flex justify-between items-start">
                               <div className="space-y-0.5">
-                                <h4 className="text-[11px] font-black uppercase leading-tight tracking-tight text-primary truncate max-w-[180px]">{item.name}</h4>
+                                <h4 className="text-[10px] font-black uppercase leading-tight tracking-tight text-primary truncate max-w-[180px]">{item.name}</h4>
                                 <p className="text-[7px] font-black text-primary/40 uppercase tracking-widest">
                                   ID: {item.id} • {item.category}
                                 </p>
@@ -438,11 +438,11 @@ export function Navbar() {
                   </ScrollArea>
 
                   {items.length > 0 && (
-                    <div className="p-4 md:p-6 border-t border-primary/10 bg-white shadow-[0_-10px_40px_rgba(0,0,0,0.05)] space-y-3 shrink-0">
+                    <div className="p-4 border-t border-primary/10 bg-white shadow-[0_-10px_40px_rgba(0,0,0,0.05)] space-y-2 shrink-0">
                       {creditInfo && (
-                        <div className="bg-primary/5 border border-primary/5 p-2 rounded-none space-y-1.5">
+                        <div className="bg-primary/5 border border-primary/5 p-2 rounded-none space-y-1">
                           <div className="flex justify-between items-center text-[8px] font-black uppercase tracking-widest">
-                            <span className="flex items-center gap-1.5"><CreditCard className="h-2.5 w-2.5 text-accent" /> Available Credit</span>
+                            <span className="flex items-center gap-1"><CreditCard className="h-2 w-2 text-accent" /> Available Credit</span>
                             <span className={cn(creditInfo.availableCredit < cartTotal ? "text-red-600" : "text-green-600")}>
                               ₹{creditInfo.availableCredit.toLocaleString('en-IN')}
                             </span>
@@ -454,26 +454,21 @@ export function Navbar() {
                         </div>
                       )}
 
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-end border-b border-primary/5 pb-2">
-                          <div className="space-y-0.5">
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center">
+                          <div className="flex flex-col">
                             <span className="text-[8px] font-black uppercase tracking-widest opacity-40">Grand Order Total</span>
-                            <div className="text-[7px] font-bold text-accent uppercase tracking-tighter flex items-center gap-1">
-                              <ShieldCheck className="h-2.5 w-2.5" /> Incl. 5% GST & Duties
+                            <div className="text-[7px] font-bold text-accent uppercase flex items-center gap-1">
+                              <ShieldCheck className="h-2 w-2" /> Incl. 5% GST
                             </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-xl md:text-2xl font-black tracking-tighter text-primary">₹{cartTotal.toLocaleString('en-IN')}</p>
-                          </div>
+                          <p className="text-xl font-black tracking-tighter text-primary">₹{cartTotal.toLocaleString('en-IN')}</p>
                         </div>
                         
                         {excessAmount > 0 && (
-                          <div className="p-2 bg-red-50 border-l-2 border-red-600 flex justify-between items-center animate-pulse">
-                            <div className="space-y-0.5">
-                              <p className="text-[8px] font-black uppercase text-red-600">Action Required</p>
-                              <p className="text-[7px] font-medium uppercase opacity-60">Pay excess to finalize.</p>
-                            </div>
-                            <span className="text-[10px] font-black text-red-700">₹{excessAmount.toLocaleString('en-IN')}</span>
+                          <div className="px-2 py-1 bg-red-50 border-l-2 border-red-600 flex justify-between items-center animate-pulse">
+                            <p className="text-[8px] font-black uppercase text-red-600">Pay Excess to Finalize</p>
+                            <span className="text-[9px] font-black text-red-700">₹{excessAmount.toLocaleString('en-IN')}</span>
                           </div>
                         )}
                       </div>
@@ -491,13 +486,13 @@ export function Navbar() {
                         ) : (
                           <div className="flex items-center justify-center gap-2">
                             <span>{excessAmount > 0 ? `PAY EXCESS & SUBMIT` : "FINALIZE ORDER"}</span>
-                            <ChevronRight className="h-3.5 w-3.5" />
+                            <ChevronRight className="h-3 w-3" />
                           </div>
                         )}
                       </Button>
                       
-                      <p className="text-[6px] font-black text-center uppercase tracking-widest opacity-30">
-                        Secure B2B Transaction • Real-time Inventory Lock
+                      <p className="text-[6px] font-black text-center uppercase tracking-widest opacity-20">
+                        Secure B2B Transaction • Real-time Lock
                       </p>
                     </div>
                   )}
