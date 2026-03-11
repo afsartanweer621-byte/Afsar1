@@ -76,7 +76,22 @@ export default function AccountPage() {
   };
 
   const sortedOrders = useMemo(() => rawOrders ? [...rawOrders].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) : [], [rawOrders]);
-  const sortedPayments = useMemo(() => rawPayments ? [...rawPayments].filter(p => !p.deleted).sort((a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()) : [], [rawPayments]);
+  
+  // Hardened Payment Filter: Only include deleted=false AND (manual OR confirmed razorpay)
+  const sortedPayments = useMemo(() => {
+    if (!rawPayments) return [];
+    return rawPayments
+      .filter(p => !p.deleted)
+      .filter(p => {
+        // If it's a portal/digital payment attempt, it MUST have a successful Razorpay ID to be valid
+        const isDigital = p.remarks?.toLowerCase().includes("direct portal") || p.remarks?.toLowerCase().includes("excess payment");
+        if (isDigital) {
+          return !!p.razorpayPaymentId;
+        }
+        return true; // Manual logs by admin are always valid
+      })
+      .sort((a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime());
+  }, [rawPayments]);
 
   const ledgerItems = useMemo(() => {
     const items = [

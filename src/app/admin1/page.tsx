@@ -19,7 +19,8 @@ import {
   MapPin,
   UserPlus,
   Download,
-  Filter
+  Filter,
+  ArrowRight
 } from "lucide-react";
 import { useFirestore, useCollection, useMemoFirebase, useUser, useAuth } from "@/firebase";
 import { collection, query, orderBy, doc, where, getDocs } from "firebase/firestore";
@@ -105,13 +106,49 @@ function Admin1Content() {
   const { data: payments, isLoading: loadingPayments } = useCollection(paymentsQuery);
   const { data: allOrders } = useCollection(ordersQuery);
 
+  const parseAmount = (val: any): number => {
+    if (val === undefined || val === null) return 0;
+    if (typeof val === 'number') return val;
+    const cleaned = String(val).replace(/[^\d.-]/g, '');
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : num;
+  };
+
+  // Hardened Payment Filter: Only include confirmed transactions
+  const confirmedPayments = useMemo(() => {
+    if (!payments) return [];
+    return payments.filter(p => {
+      if (p.deleted) return false;
+      const isDigital = p.remarks?.toLowerCase().includes("direct portal") || p.remarks?.toLowerCase().includes("excess payment");
+      if (isDigital) return !!p.razorpayPaymentId;
+      return true;
+    });
+  }, [payments]);
+
+  const calculateFinancials = (retailer: any) => {
+    if (!allOrders || !confirmedPayments) return { ordersTotal: 0, paymentsTotal: 0, currentOS: 0 };
+    
+    const masterId = retailer.id;
+    const approvedOrdersTotal = allOrders
+      .filter(o => (o.userId === masterId) && o.status === 'Approved')
+      .reduce((acc, curr) => acc + parseAmount(curr.totalAmount), 0);
+      
+    const paymentsTotal = confirmedPayments
+      .filter(p => p.userId === masterId)
+      .reduce((acc, curr) => acc + parseAmount(curr.amount), 0);
+    
+    const openingBal = parseAmount(retailer.openingBalance);
+    const currentOS = approvedOrdersTotal - openingBal - paymentsTotal;
+    
+    return { ordersTotal: approvedOrdersTotal, paymentsTotal, currentOS };
+  };
+
   const filteredRequests = requests?.filter(req => 
     req.firmName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     req.gst?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     req.phone?.includes(searchTerm)
   );
 
-  // Dropdown only contains retailers present in the Master Registry (Approved requests)
   const uniqueRetailersForDropdown = useMemo(() => {
     if (!requests) return [];
     return requests
@@ -140,27 +177,6 @@ function Admin1Content() {
     window.location.reload();
   };
 
-  const parseAmount = (val: any): number => {
-    if (val === undefined || val === null) return 0;
-    if (typeof val === 'number') return val;
-    const cleaned = String(val).replace(/[^\d.-]/g, '');
-    const num = parseFloat(cleaned);
-    return isNaN(num) ? 0 : num;
-  };
-
-  const calculateCurrentOS = (retailer: any) => {
-    if (!allOrders || !payments) return 0;
-    const masterId = retailer.id;
-    const approvedOrdersTotal = allOrders
-      .filter(o => (o.userId === masterId) && o.status === 'Approved')
-      .reduce((acc, curr) => acc + parseAmount(curr.totalAmount), 0);
-    const paymentsTotal = payments
-      .filter(p => p.userId === masterId && !p.deleted)
-      .reduce((acc, curr) => acc + parseAmount(curr.amount), 0);
-    
-    return approvedOrdersTotal - parseAmount(retailer.openingBalance) - paymentsTotal;
-  };
-
   const handleDownloadRegistryCSV = () => {
     if (!filteredRequests) return;
 
@@ -173,11 +189,12 @@ function Admin1Content() {
       "Access Code",
       "Credit Limit",
       "Opening Balance",
+      "Total Payments",
       "Current O/S"
     ];
 
     const rows = filteredRequests.map(req => {
-      const currentOS = calculateCurrentOS(req);
+      const { currentOS, paymentsTotal } = calculateFinancials(req);
       const state = getStateFromGST(req.gst || "");
       return [
         req.status || "Pending",
@@ -188,6 +205,7 @@ function Admin1Content() {
         req.accessCode || "---",
         parseAmount(req.creditLimit),
         parseAmount(req.openingBalance),
+        paymentsTotal,
         currentOS
       ];
     });
@@ -334,19 +352,21 @@ function Admin1Content() {
   };
 
   const totals = useMemo(() => {
-    if (!filteredRequests) return { creditLimit: 0, outstanding: 0 };
+    if (!filteredRequests) return { creditLimit: 0, outstanding: 0, totalPaid: 0 };
     return filteredRequests.reduce((acc, req) => {
+      const { currentOS, paymentsTotal } = calculateFinancials(req);
       acc.creditLimit += parseAmount(req.creditLimit);
-      acc.outstanding += calculateCurrentOS(req);
+      acc.outstanding += currentOS;
+      acc.totalPaid += paymentsTotal;
       return acc;
-    }, { creditLimit: 0, outstanding: 0 });
-  }, [filteredRequests, allOrders, payments]);
+    }, { creditLimit: 0, outstanding: 0, totalPaid: 0 });
+  }, [filteredRequests, allOrders, confirmedPayments]);
 
   const handleDownloadLedger = (retailer: any) => {
-    if (!allOrders || !payments) return;
+    if (!allOrders || !confirmedPayments) return;
     const masterId = retailer.id;
     const retailerOrders = allOrders.filter(o => o.userId === masterId && o.status === 'Approved');
-    const retailerPayments = payments.filter(p => p.userId === masterId && !p.deleted);
+    const retailerPayments = confirmedPayments.filter(p => p.userId === masterId);
     const openingBal = parseAmount(retailer.openingBalance);
     
     const entries = [
@@ -451,17 +471,17 @@ function Admin1Content() {
                       <TableHead className="uppercase font-black text-[10px]">Status</TableHead>
                       <TableHead className="uppercase font-black text-[10px]">Firm</TableHead>
                       <TableHead className="uppercase font-black text-[10px]">GST & State</TableHead>
-                      <TableHead className="uppercase font-black text-[10px]">Phone</TableHead>
                       <TableHead className="uppercase font-black text-[10px]">Access Code</TableHead>
-                      <TableHead className="uppercase font-black text-[10px]">Credit Limit</TableHead>
+                      <TableHead className="uppercase font-black text-[10px]">Limit</TableHead>
                       <TableHead className="uppercase font-black text-[10px]">Opening Bal.</TableHead>
+                      <TableHead className="uppercase font-black text-[10px]">Total Paid</TableHead>
                       <TableHead className="uppercase font-black text-[10px]">Current O/S</TableHead>
                       <TableHead className="uppercase font-black text-[10px] text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredRequests?.map((req) => {
-                      const currentOS = calculateCurrentOS(req);
+                      const { currentOS, paymentsTotal } = calculateFinancials(req);
                       const stateName = getStateFromGST(req.gst || "");
                       return (
                         <TableRow key={req.id} className="border-primary/5">
@@ -480,7 +500,6 @@ function Admin1Content() {
                               </span>
                             </div>
                           </TableCell>
-                          <TableCell className="font-mono text-[10px] font-bold">{req.phone}</TableCell>
                           <TableCell className="font-mono text-[10px] font-black text-primary">
                             {req.accessCode ? (
                               <div className="flex items-center gap-1">
@@ -490,6 +509,7 @@ function Admin1Content() {
                           </TableCell>
                           <TableCell className="font-black text-[10px] text-primary">₹{parseAmount(req.creditLimit).toLocaleString()}</TableCell>
                           <TableCell className={cn("font-black text-[10px]", parseAmount(req.openingBalance) < 0 ? "text-red-600" : "text-accent")}>₹{parseAmount(req.openingBalance).toLocaleString()}</TableCell>
+                          <TableCell className="font-black text-[10px] text-green-600">₹{paymentsTotal.toLocaleString()}</TableCell>
                           <TableCell className={cn("font-black text-[10px]", currentOS > 0 ? "text-red-600" : "text-green-600")}>₹{currentOS.toLocaleString()}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
@@ -515,9 +535,10 @@ function Admin1Content() {
                   </TableBody>
                   <TableFooter className="bg-primary/5">
                     <TableRow className="hover:bg-transparent">
-                      <TableCell colSpan={5} className="text-[10px] font-black uppercase text-right py-6">Registry Totals</TableCell>
+                      <TableCell colSpan={4} className="text-[10px] font-black uppercase text-right py-6">Registry Totals</TableCell>
                       <TableCell className="font-black text-[10px] text-primary">₹{totals.creditLimit.toLocaleString()}</TableCell>
                       <TableCell></TableCell>
+                      <TableCell className="font-black text-[10px] text-green-600">₹{totals.totalPaid.toLocaleString()}</TableCell>
                       <TableCell className={cn("font-black text-[10px]", totals.outstanding > 0 ? "text-red-600" : "text-green-600")}>₹{totals.outstanding.toLocaleString()}</TableCell>
                       <TableCell></TableCell>
                     </TableRow>
@@ -547,7 +568,7 @@ function Admin1Content() {
                   <TableBody>
                     {loadingPayments ? (
                       <TableRow><TableCell colSpan={4} className="text-center py-20 animate-pulse uppercase font-black text-[10px]">Syncing...</TableCell></TableRow>
-                    ) : payments?.filter(p => !p.deleted).map((p) => (
+                    ) : confirmedPayments?.map((p) => (
                       <TableRow key={p.id}>
                         <TableCell className="text-[10px] font-bold">{new Date(p.paymentDate).toLocaleDateString()}</TableCell>
                         <TableCell className="text-[10px] font-black uppercase text-accent truncate max-w-[100px]">{getRetailerName(p.userId)}</TableCell>
