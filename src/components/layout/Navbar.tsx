@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { Bell, ShoppingCart, User, LogIn, LogOut, Trash2, LayoutDashboard, Fingerprint } from "lucide-react";
+import { Bell, ShoppingCart, User, LogIn, LogOut, Trash2, LayoutDashboard, Fingerprint, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -26,7 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useRouter, usePathname } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { doc, collection, query, orderBy } from "firebase/firestore";
+import { doc, collection, query, orderBy, where } from "firebase/firestore";
 import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { cn } from "@/lib/utils";
 
@@ -40,10 +40,10 @@ export function Navbar() {
   const { items, removeFromCart, cartCount, cartTotal, clearCart } = useCart();
   const [mounted, setMounted] = useState(false);
   const [isAdminAuthorized, setIsAdminAuthorized] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    // Check for administrative terminal authorization in session storage
     const authStatus = sessionStorage.getItem("admin_terminal_authorized");
     setIsAdminAuthorized(authStatus === "true");
   }, [pathname]);
@@ -52,6 +52,56 @@ export function Navbar() {
     user ? doc(db, "AuthorizedUsers", user.uid) : null, 
   [db, user]);
   const { data: sessionProfile } = useDoc(sessionProfileRef);
+
+  const masterId = sessionProfile?.originalRequestId || user?.uid;
+
+  // Real-time queries for credit calculation
+  const userOrdersQuery = useMemoFirebase(() => 
+    masterId ? query(collection(db, "Orders"), where("userId", "==", masterId)) : null, 
+  [db, masterId]);
+
+  const userPaymentsQuery = useMemoFirebase(() => 
+    masterId ? query(collection(db, "Payments"), where("userId", "==", masterId)) : null, 
+  [db, masterId]);
+
+  const { data: userOrders } = useCollection(userOrdersQuery);
+  const { data: userPayments } = useCollection(userPaymentsQuery);
+
+  const parseAmount = (val: any): number => {
+    if (val === undefined || val === null) return 0;
+    if (typeof val === 'number') return val;
+    const cleaned = String(val).replace(/[^\d.-]/g, '');
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : num;
+  };
+
+  const creditInfo = useMemo(() => {
+    if (!sessionProfile || !userOrders || !userPayments) return null;
+
+    const approvedOrdersTotal = userOrders
+      ?.filter(o => o.status === 'Approved')
+      .reduce((acc, curr) => acc + parseAmount(curr.totalAmount), 0) || 0;
+      
+    const paymentsTotal = userPayments
+      ?.filter(p => !p.deleted)
+      .reduce((acc, curr) => acc + parseAmount(curr.amount), 0) || 0;
+
+    const openingBalance = parseAmount(sessionProfile.openingBalance);
+    const creditLimit = parseAmount(sessionProfile.creditLimit);
+
+    // Outstanding = (Approved Orders + Opening Debits) - (Payments + Opening Credits)
+    const totalDebits = approvedOrdersTotal + (openingBalance < 0 ? Math.abs(openingBalance) : 0);
+    const totalCredits = paymentsTotal + (openingBalance > 0 ? openingBalance : 0);
+    const currentOutstanding = totalDebits - totalCredits;
+    const availableCredit = Math.max(0, creditLimit - currentOutstanding);
+
+    return { availableCredit, currentOutstanding, creditLimit };
+  }, [sessionProfile, userOrders, userPayments]);
+
+  const excessAmount = useMemo(() => {
+    if (!creditInfo) return 0;
+    return Math.max(0, cartTotal - creditInfo.availableCredit);
+  }, [creditInfo, cartTotal]);
 
   const notificationsQuery = useMemoFirebase(() => 
     user ? query(collection(db, "Notifications"), orderBy("createdAt", "desc")) : null,
@@ -77,23 +127,10 @@ export function Navbar() {
     }
   };
 
-  const markAllAsRead = (open: boolean) => {
-    if (!open || !user || !notifications || unreadCount === 0) return;
+  const finalizeOrder = (paymentId?: string) => {
+    if (!user || !sessionProfile) return;
     
-    notifications.forEach(n => {
-      if (!readIds.has(n.id)) {
-        const readRef = doc(db, "AuthorizedUsers", user.uid, "readNotifications", n.id);
-        setDocumentNonBlocking(readRef, { readAt: new Date().toISOString() }, { merge: true });
-      }
-    });
-  };
-
-  const handleCheckout = () => {
-    if (!user || !sessionProfile) {
-      toast({ variant: "destructive", title: "Authentication Required", description: "Please log in to submit orders." });
-      return;
-    }
-
+    setIsProcessingPayment(true);
     const orderId = crypto.randomUUID();
     const orderRef = doc(db, "Orders", orderId);
     
@@ -102,10 +139,7 @@ export function Navbar() {
     const orderData = {
       id: orderId,
       userId: masterId,
-      items: items.map(i => ({
-        ...i,
-        discount: 0
-      })),
+      items: items.map(i => ({ ...i, discount: 0 })),
       totalAmount: cartTotal,
       status: "Processing",
       createdAt: new Date().toISOString(),
@@ -114,19 +148,78 @@ export function Navbar() {
 
     setDocumentNonBlocking(orderRef, orderData, { merge: true });
 
+    if (paymentId) {
+      const pRef = doc(collection(db, "Payments"));
+      setDocumentNonBlocking(pRef, {
+        id: pRef.id,
+        userId: masterId,
+        amount: excessAmount,
+        paymentDate: new Date().toISOString(),
+        remarks: `Excess Amount Payment (Razorpay: ${paymentId})`,
+        createdAt: new Date().toISOString()
+      }, { merge: true });
+    }
+
     toast({
       title: "Order Submitted",
-      description: "Our logistics team will verify your order and update your billing statement.",
+      description: paymentId 
+        ? `Payment of ₹${excessAmount.toLocaleString()} verified. Order placed.` 
+        : "Our logistics team will verify your order and update your billing statement.",
     });
     
     clearCart();
+    setIsProcessingPayment(false);
     router.push("/account");
   };
 
+  const handleCheckout = () => {
+    if (!user || !sessionProfile) {
+      toast({ variant: "destructive", title: "Authentication Required", description: "Please log in to submit orders." });
+      return;
+    }
+
+    if (excessAmount > 0) {
+      setIsProcessingPayment(true);
+      const options = {
+        key: "rzp_live_SPD2FHOlvuoCjl",
+        amount: Math.round(excessAmount * 100),
+        currency: "INR",
+        name: "Mochibazaar",
+        description: `Excess Payment for Order (${items.length} Articles)`,
+        handler: function (response: any) {
+          finalizeOrder(response.razorpay_payment_id);
+        },
+        prefill: {
+          name: sessionProfile.firmName,
+          contact: sessionProfile.phone,
+        },
+        theme: { color: "#000000" },
+        modal: {
+          ondismiss: function () {
+            setIsProcessingPayment(false);
+          }
+        }
+      };
+      
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+    } else {
+      finalizeOrder();
+    }
+  };
+
   const isAuthorized = !!user && !!sessionProfile;
-  
-  // Only show the terminal switcher tabs if the admin is authorized AND they are actually on an admin page
   const showAdminTabs = isAdminAuthorized && (pathname === '/admin' || pathname === '/admin1');
+
+  const markAllAsRead = (open: boolean) => {
+    if (!open || !user || !notifications || unreadCount === 0) return;
+    notifications.forEach(n => {
+      if (!readIds.has(n.id)) {
+        const readRef = doc(db, "AuthorizedUsers", user.uid, "readNotifications", n.id);
+        setDocumentNonBlocking(readRef, { readAt: new Date().toISOString() }, { merge: true });
+      }
+    });
+  };
 
   if (!mounted) {
     return (
@@ -147,28 +240,15 @@ export function Navbar() {
             <Logo className="h-4 md:h-5 w-auto transition-all group-hover:opacity-70" />
           </Link>
 
-          {/* Admin Tabs - Only shown when authorized and inside an admin route */}
           {showAdminTabs && (
             <div className="hidden sm:flex items-center gap-1 border-l border-primary/10 pl-4 md:pl-8">
               <Link href="/admin1">
-                <Button 
-                  variant="ghost" 
-                  className={cn(
-                    "h-8 px-3 rounded-none uppercase font-black text-[8px] tracking-[0.2em] gap-2",
-                    pathname === '/admin1' ? "bg-accent text-white" : "text-primary/40 hover:text-primary"
-                  )}
-                >
+                <Button variant="ghost" className={cn("h-8 px-3 rounded-none uppercase font-black text-[8px] tracking-[0.2em] gap-2", pathname === '/admin1' ? "bg-accent text-white" : "text-primary/40 hover:text-primary")}>
                   <Fingerprint className="h-3 w-3" /> Registry
                 </Button>
               </Link>
               <Link href="/admin">
-                <Button 
-                  variant="ghost" 
-                  className={cn(
-                    "h-8 px-3 rounded-none uppercase font-black text-[8px] tracking-[0.2em] gap-2",
-                    pathname === '/admin' ? "bg-accent text-white" : "text-primary/40 hover:text-primary"
-                  )}
-                >
+                <Button variant="ghost" className={cn("h-8 px-3 rounded-none uppercase font-black text-[8px] tracking-[0.2em] gap-2", pathname === '/admin' ? "bg-accent text-white" : "text-primary/40 hover:text-primary")}>
                   <LayoutDashboard className="h-3 w-3" /> Management
                 </Button>
               </Link>
@@ -220,7 +300,7 @@ export function Navbar() {
                     )}
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-[80vw] sm:w-[25vw] sm:max-w-[25vw] flex flex-col p-0 rounded-none shadow-2xl border-l border-primary/10 transition-all duration-300">
+                <SheetContent side="right" className="w-[80vw] sm:w-[25vw] sm:max-w-[25vw] flex flex-col p-0 rounded-none shadow-2xl border-l border-primary/10">
                   <SheetHeader className="p-6 md:p-8 border-b border-primary/10">
                     <SheetTitle className="text-2xl md:text-3xl font-black uppercase tracking-tighter">Wholesale Cart</SheetTitle>
                     <SheetDescription className="text-[9px] font-black uppercase text-accent tracking-widest">Review Registry Order</SheetDescription>
@@ -231,31 +311,14 @@ export function Navbar() {
                         <div key={item.id} className="flex flex-col gap-3 py-4 border-b border-primary/5 last:border-none">
                           <div className="flex justify-between items-start gap-4">
                             <div className="space-y-1 flex-1">
-                              <h4 className="text-base md:text-lg font-black uppercase leading-tight tracking-tight text-primary">
-                                {item.name}
-                              </h4>
-                              <p className="text-[8px] font-black text-primary/40 uppercase tracking-widest bg-primary/5 inline-block px-1.5 py-0.5">
-                                SKU: {item.id}
-                              </p>
+                              <h4 className="text-base md:text-lg font-black uppercase leading-tight tracking-tight text-primary">{item.name}</h4>
+                              <p className="text-[8px] font-black text-primary/40 uppercase tracking-widest bg-primary/5 inline-block px-1.5 py-0.5">SKU: {item.id}</p>
                             </div>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={() => removeFromCart(item.id)} 
-                              className="h-7 w-7 text-destructive hover:bg-destructive/5 shrink-0"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => removeFromCart(item.id)} className="h-7 w-7 text-destructive hover:bg-destructive/5 shrink-0"><Trash2 className="h-4 w-4" /></Button>
                           </div>
                           <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest bg-secondary/5 p-3 border border-primary/5">
-                            <div className="flex items-center gap-2">
-                              <span className="opacity-40">Qty:</span>
-                              <span className="text-primary">{item.quantity} UNITS</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="opacity-40">Total:</span>
-                              <span className="text-primary">₹{(item.price * item.quantity).toLocaleString('en-IN')}</span>
-                            </div>
+                            <div className="flex items-center gap-2"><span className="opacity-40">Qty:</span><span className="text-primary">{item.quantity} UNITS</span></div>
+                            <div className="flex items-center gap-2"><span className="opacity-40">Total:</span><span className="text-primary">₹{(item.price * item.quantity).toLocaleString('en-IN')}</span></div>
                           </div>
                         </div>
                       ))}
@@ -269,18 +332,36 @@ export function Navbar() {
                   </ScrollArea>
                   {items.length > 0 && (
                     <div className="p-6 md:p-8 border-t border-primary/10 bg-white space-y-6">
-                      <div className="flex justify-between items-end border-b border-primary/10 pb-4">
-                        <div className="space-y-1">
-                          <span className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Grand Order Total</span>
-                          <div className="text-[8px] font-bold text-accent uppercase tracking-widest">Incl. 5% GST & Duties</div>
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-end border-b border-primary/10 pb-4">
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Grand Order Total</span>
+                            <div className="text-[8px] font-bold text-accent uppercase tracking-widest">Incl. 5% GST & Duties</div>
+                          </div>
+                          <p className="text-xl md:text-2xl font-black tracking-tighter">₹{cartTotal.toLocaleString('en-IN')}</p>
                         </div>
-                        <p className="text-xl md:text-2xl font-black tracking-tighter">₹{cartTotal.toLocaleString('en-IN')}</p>
+                        
+                        {excessAmount > 0 && (
+                          <div className="p-4 bg-red-50 border border-red-100 space-y-2">
+                            <p className="text-[9px] font-black uppercase text-red-600">Credit Limit Exceeded</p>
+                            <div className="flex justify-between items-center text-[10px] font-bold">
+                              <span className="opacity-60">Excess to Pay:</span>
+                              <span className="text-red-700">₹{excessAmount.toLocaleString('en-IN')}</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
+
                       <Button 
                         onClick={handleCheckout} 
+                        disabled={isProcessingPayment}
                         className="w-full h-14 bg-primary text-background hover:bg-accent transition-all rounded-none uppercase font-black text-[10px] tracking-[0.3em]"
                       >
-                        Finalize Sourcing Order
+                        {isProcessingPayment ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          excessAmount > 0 ? `Pay Excess (₹${excessAmount.toLocaleString()}) & Submit` : "Finalize Sourcing Order"
+                        )}
                       </Button>
                     </div>
                   )}
@@ -295,9 +376,7 @@ export function Navbar() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48 rounded-none border border-primary/5 shadow-2xl p-2">
                   <div className="px-2 py-2 border-b border-primary/5 mb-1">
-                    <p className="text-[9px] font-black uppercase text-primary truncate">
-                      {sessionProfile?.firmName || "Partner"}
-                    </p>
+                    <p className="text-[9px] font-black uppercase text-primary truncate">{sessionProfile?.firmName || "Partner"}</p>
                   </div>
                   <DropdownMenuItem asChild className="uppercase font-black text-[7px] tracking-widest p-2 cursor-pointer">
                     <Link href="/account">Profile</Link>
@@ -310,18 +389,13 @@ export function Navbar() {
             </>
           ) : (
             <div className="flex items-center gap-1">
-              <Link href="/login">
-                <Button variant="ghost" className="h-8 px-2 uppercase font-black text-[8px] tracking-widest">Login</Button>
-              </Link>
-              <Link href="/register">
-                <Button className="h-8 px-3 bg-primary text-background rounded-none uppercase font-black text-[8px] tracking-widest">Registry</Button>
-              </Link>
+              <Link href="/login"><Button variant="ghost" className="h-8 px-2 uppercase font-black text-[8px] tracking-widest">Login</Button></Link>
+              <Link href="/register"><Button className="h-8 px-3 bg-primary text-background rounded-none uppercase font-black text-[8px] tracking-widest">Registry</Button></Link>
             </div>
           )}
         </div>
       </div>
       
-      {/* Mobile Admin Navigation Bar - Only shown when authorized and inside an admin route */}
       {showAdminTabs && (
         <div className="sm:hidden flex items-center justify-center gap-4 py-2 border-t border-primary/5">
           <Link href="/admin1" className={cn("text-[8px] font-black uppercase tracking-widest", pathname === '/admin1' ? "text-accent" : "text-primary/40")}>Registry</Link>
