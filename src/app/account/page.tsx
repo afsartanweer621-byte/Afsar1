@@ -77,18 +77,16 @@ export default function AccountPage() {
 
   const sortedOrders = useMemo(() => rawOrders ? [...rawOrders].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) : [], [rawOrders]);
   
-  // Hardened Payment Filter: Only include deleted=false AND (manual OR confirmed razorpay)
   const sortedPayments = useMemo(() => {
     if (!rawPayments) return [];
     return rawPayments
       .filter(p => !p.deleted)
       .filter(p => {
-        // If it's a portal/digital payment attempt, it MUST have a successful Razorpay ID to be valid
         const isDigital = p.remarks?.toLowerCase().includes("direct portal") || p.remarks?.toLowerCase().includes("excess payment");
         if (isDigital) {
           return !!p.razorpayPaymentId;
         }
-        return true; // Manual logs by admin are always valid
+        return true; 
       })
       .sort((a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime());
   }, [rawPayments]);
@@ -625,7 +623,7 @@ export default function AccountPage() {
                   </div>
 
                   <Button 
-                    onClick={handlePayNow}
+                    onClick={handlePayNow} 
                     disabled={isProcessing || !paymentAmount}
                     className="w-full h-20 bg-primary text-background hover:bg-accent rounded-none uppercase font-black text-[11px] tracking-[0.4em] transition-all"
                   >
