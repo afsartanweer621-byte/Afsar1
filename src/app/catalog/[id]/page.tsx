@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -58,7 +57,6 @@ export default function ArticleDetailPage() {
     if (!fromFirestore) return fromFallback;
     if (!fromFallback) return fromFirestore;
     
-    // Merge Logic with Delta Support
     if (fromFirestore.name) {
       return { ...fromFallback, ...fromFirestore };
     }
@@ -102,7 +100,8 @@ export default function ArticleDetailPage() {
       quantity: qty,
       category: product.category,
       mrp: product.mrp,
-      margin: product.margin
+      margin: product.margin,
+      imageUrl: images[0] || undefined
     });
 
     toast({ title: "Added to Cart", description: `${qty} units of ${product.name}` });
@@ -150,7 +149,6 @@ export default function ArticleDetailPage() {
         </Button>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16">
-          {/* Product Image Section */}
           <div className="space-y-4">
             <div className="relative aspect-square bg-primary/5 border border-primary/5 overflow-hidden group">
               {images.length > 0 ? (
@@ -174,7 +172,6 @@ export default function ArticleDetailPage() {
               </div>
             </div>
             
-            {/* Thumbnails */}
             {images.length > 1 && (
               <div className="flex gap-2">
                 {images.map((img, idx) => (
@@ -211,7 +208,6 @@ export default function ArticleDetailPage() {
             </div>
           </div>
 
-          {/* Product Info Section */}
           <div className="space-y-8">
             <div className="space-y-2">
               <span className="text-accent font-black uppercase tracking-[0.3em] text-[9px]">Article #{product.id}</span>

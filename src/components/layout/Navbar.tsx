@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { 
   Bell, 
   ShoppingCart, 
   User, 
-  LogIn, 
   LogOut, 
   Trash2, 
   LayoutDashboard, 
@@ -17,7 +17,8 @@ import {
   AlertCircle,
   CreditCard,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Package
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -72,7 +73,6 @@ export function Navbar() {
 
   const masterId = sessionProfile?.originalRequestId || user?.uid;
 
-  // Real-time queries for credit calculation
   const userOrdersQuery = useMemoFirebase(() => 
     masterId ? query(collection(db, "Orders"), where("userId", "==", masterId)) : null, 
   [db, masterId]);
@@ -136,7 +136,7 @@ export function Navbar() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      toast({ title: "Signed Out", description: "You have been logged out of the secure portal." });
+      toast({ title: "Signed Out", description: "You have been logged out." });
       router.push("/");
     } catch (error) {
       console.error("Logout error", error);
@@ -180,7 +180,7 @@ export function Navbar() {
       title: "Order Submitted",
       description: paymentId 
         ? `Payment of ₹${excessAmount.toLocaleString()} verified. Order placed.` 
-        : "Our logistics team will verify your order and update your billing statement.",
+        : "Order sent for logistics verification.",
     });
     
     clearCart();
@@ -316,7 +316,7 @@ export function Navbar() {
                     )}
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-[100vw] sm:w-[450px] flex flex-col p-0 rounded-none shadow-2xl border-l border-primary/10 transition-all duration-500">
+                <SheetContent side="right" className="w-[100vw] sm:w-[480px] flex flex-col p-0 rounded-none shadow-2xl border-l border-primary/10 transition-all duration-500">
                   <SheetHeader className="p-6 md:p-8 border-b border-primary/5 bg-primary/5">
                     <div className="flex justify-between items-center">
                       <div className="space-y-1">
@@ -334,48 +334,59 @@ export function Navbar() {
                   <ScrollArea className="flex-grow">
                     <div className="p-6 md:p-8 space-y-6">
                       {items.map((item) => (
-                        <div key={item.id} className="group relative flex flex-col bg-white border border-primary/5 p-4 rounded-none shadow-sm hover:shadow-md hover:border-primary/10 transition-all">
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="space-y-1">
-                              <h4 className="text-sm md:text-base font-black uppercase leading-tight tracking-tight text-primary group-hover:text-accent transition-colors">{item.name}</h4>
-                              <p className="text-[8px] font-black text-primary/40 uppercase tracking-widest flex items-center gap-2">
-                                <span className="bg-primary/5 px-1.5 py-0.5">SKU: {item.id}</span>
-                                <span className="text-accent/60">{item.category}</span>
-                              </p>
-                            </div>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={() => removeFromCart(item.id)} 
-                              className="h-8 w-8 text-primary/20 hover:text-red-600 hover:bg-red-50 rounded-none transition-colors"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                        <div key={item.id} className="group flex bg-white border border-primary/5 p-4 rounded-none shadow-sm hover:shadow-md transition-all gap-4">
+                          <div className="relative h-20 w-20 bg-primary/5 shrink-0 border border-primary/5">
+                            {item.imageUrl ? (
+                              <Image src={item.imageUrl} alt={item.name} fill className="object-cover" />
+                            ) : (
+                              <div className="h-full w-full flex items-center justify-center opacity-10">
+                                <Package className="h-6 w-6" />
+                              </div>
+                            )}
                           </div>
-
-                          <div className="flex items-center justify-between pt-4 border-t border-primary/5">
-                            <div className="flex items-center bg-primary/5 rounded-none p-1 border border-primary/5">
+                          
+                          <div className="flex-grow flex flex-col justify-between">
+                            <div className="flex justify-between items-start">
+                              <div className="space-y-0.5">
+                                <h4 className="text-sm font-black uppercase leading-tight tracking-tight text-primary">{item.name}</h4>
+                                <p className="text-[8px] font-black text-primary/40 uppercase tracking-widest">
+                                  SKU: {item.id} • {item.category}
+                                </p>
+                              </div>
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
-                                onClick={() => updateQuantity(item.id, Math.max(4, item.quantity - 4))}
-                                className="h-7 w-7 text-primary/40 hover:text-primary hover:bg-white transition-all rounded-none"
+                                onClick={() => removeFromCart(item.id)} 
+                                className="h-6 w-6 text-primary/20 hover:text-red-600 transition-colors"
                               >
-                                <Minus className="h-3 w-3" />
-                              </Button>
-                              <span className="w-10 text-center text-[10px] font-black text-primary">{item.quantity}</span>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => updateQuantity(item.id, item.quantity + 4)}
-                                className="h-7 w-7 text-primary/40 hover:text-primary hover:bg-white transition-all rounded-none"
-                              >
-                                <Plus className="h-3 w-3" />
+                                <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             </div>
-                            <div className="text-right">
-                              <div className="text-[8px] font-black uppercase opacity-40 leading-none mb-1">Subtotal</div>
-                              <div className="text-sm font-black text-primary">₹{(item.price * item.quantity).toLocaleString('en-IN')}</div>
+
+                            <div className="flex items-center justify-between pt-2">
+                              <div className="flex items-center bg-primary/5 rounded-none p-0.5 border border-primary/5">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={() => updateQuantity(item.id, Math.max(4, item.quantity - 4))}
+                                  className="h-6 w-6 text-primary/40 hover:text-primary rounded-none"
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </Button>
+                                <span className="w-8 text-center text-[10px] font-black text-primary">{item.quantity}</span>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={() => updateQuantity(item.id, item.quantity + 4)}
+                                  className="h-6 w-6 text-primary/40 hover:text-primary rounded-none"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-[10px] font-black text-primary">₹{(item.price * item.quantity).toLocaleString('en-IN')}</div>
+                                <div className="text-[7px] opacity-40 font-bold">@ ₹{item.price.toLocaleString()}</div>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -386,10 +397,7 @@ export function Navbar() {
                           <div className="bg-primary/5 p-8 rounded-full">
                             <ShoppingCart className="h-16 w-16" />
                           </div>
-                          <div className="space-y-2">
-                            <p className="text-[10px] font-black uppercase tracking-[0.4em]">Registry Empty</p>
-                            <p className="text-[8px] font-bold uppercase max-w-[200px] leading-relaxed">Your procurement list is currently void. Browse the catalog to add items.</p>
-                          </div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.4em]">Registry Empty</p>
                           <Link href="/catalog">
                             <Button className="h-12 px-8 bg-primary text-background rounded-none uppercase font-black text-[9px] tracking-widest gap-2">
                               Browse Catalog <ChevronRight className="h-3 w-3" />
@@ -402,7 +410,6 @@ export function Navbar() {
 
                   {items.length > 0 && (
                     <div className="p-6 md:p-8 border-t border-primary/10 bg-white shadow-[0_-10px_40px_rgba(0,0,0,0.05)] space-y-6">
-                      {/* Credit Status Card */}
                       {creditInfo && (
                         <div className="bg-primary/5 border border-primary/5 p-4 rounded-none space-y-3">
                           <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
@@ -438,11 +445,11 @@ export function Navbar() {
                         </div>
                         
                         {excessAmount > 0 && (
-                          <div className="p-4 bg-red-50 border-l-4 border-red-600 space-y-3">
+                          <div className="p-4 bg-red-50 border-l-4 border-red-600">
                             <div className="flex justify-between items-start">
                               <div className="space-y-1">
                                 <p className="text-[9px] font-black uppercase text-red-600">Action Required</p>
-                                <p className="text-[8px] font-medium uppercase opacity-60 leading-tight">Pay excess amount to finalize order immediately.</p>
+                                <p className="text-[8px] font-medium uppercase opacity-60">Pay excess amount to finalize order.</p>
                               </div>
                               <span className="text-xs font-black text-red-700">₹{excessAmount.toLocaleString('en-IN')}</span>
                             </div>
@@ -454,15 +461,12 @@ export function Navbar() {
                         onClick={handleCheckout} 
                         disabled={isProcessingPayment}
                         className={cn(
-                          "w-full h-16 transition-all duration-300 rounded-none uppercase font-black text-[10px] tracking-[0.3em] shadow-xl hover:shadow-2xl",
+                          "w-full h-16 transition-all duration-300 rounded-none uppercase font-black text-[10px] tracking-[0.3em] shadow-xl",
                           excessAmount > 0 ? "bg-accent text-white hover:bg-accent/90" : "bg-primary text-background hover:bg-primary/90"
                         )}
                       >
                         {isProcessingPayment ? (
-                          <div className="flex items-center gap-3">
-                            <Loader2 className="h-5 w-5 animate-spin" />
-                            <span>PROCESSING...</span>
-                          </div>
+                          <Loader2 className="h-5 w-5 animate-spin" />
                         ) : (
                           <div className="flex items-center justify-center gap-3">
                             <span>{excessAmount > 0 ? `PAY EXCESS & SUBMIT` : "FINALIZE SOURCING ORDER"}</span>

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -71,17 +70,12 @@ export default function CatalogPage() {
 
     const firestoreMap = new Map(firestoreProducts.map(p => [p.id, p]));
     
-    // PERFORM PROPERTY-LEVEL MERGE WITH DELTA VS ABSOLUTE LOGIC
     const merged = base.map(p => {
       const fsProduct = firestoreMap.get(p.id);
       if (!fsProduct) return p;
-      
-      // If fsProduct has a name, it's a manual override (absolute value)
       if (fsProduct.name) {
         return { ...p, ...fsProduct };
       }
-      
-      // If fsProduct exists but has no name, it was created by atomic increments (delta)
       return { 
         ...p, 
         ...fsProduct, 
@@ -140,6 +134,8 @@ export default function CatalogPage() {
       return;
     }
 
+    const displayImg = (product.imageUrls && Array.isArray(product.imageUrls) && product.imageUrls[0]) || product.imageUrl;
+
     addToCart({
       id: product.id,
       name: product.name,
@@ -147,7 +143,8 @@ export default function CatalogPage() {
       quantity: qty,
       category: product.category,
       mrp: product.mrp,
-      margin: product.margin
+      margin: product.margin,
+      imageUrl: displayImg
     });
 
     toast({ title: "Added to Cart", description: `${qty} units of ${product.name}` });

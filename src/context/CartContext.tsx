@@ -9,7 +9,8 @@ export interface CartItem {
   quantity: number;
   category?: string;
   mrp?: number;
-  margin?: string;
+  margin?: string | number;
+  imageUrl?: string;
 }
 
 interface CartContextType {
