@@ -158,14 +158,16 @@ export function Navbar() {
     const orderId = crypto.randomUUID();
     const orderRef = doc(db, "Orders", orderId);
     
-    const masterId = sessionProfile?.originalRequestId || user.uid;
+    const masterIdSnapshot = sessionProfile?.originalRequestId || user.uid;
     const finalAmountPaid = amountPaid || 0;
+    const itemsSnapshot = [...items];
+    const totalSnapshot = cartTotal;
     
     const orderData = {
       id: orderId,
-      userId: masterId,
-      items: items.map(i => ({ ...i, discount: 0 })),
-      totalAmount: cartTotal,
+      userId: masterIdSnapshot,
+      items: itemsSnapshot.map(i => ({ ...i, discount: 0 })),
+      totalAmount: totalSnapshot,
       status: "Processing",
       paymentId: paymentId || null,
       paidAmount: finalAmountPaid,
@@ -179,7 +181,7 @@ export function Navbar() {
       const pRef = doc(collection(db, "Payments"));
       setDocumentNonBlocking(pRef, {
         id: pRef.id,
-        userId: masterId,
+        userId: masterIdSnapshot,
         amount: finalAmountPaid,
         paymentDate: new Date().toISOString(),
         remarks: `Excess Payment (Order: ${orderId.slice(0,8)}, Razorpay: ${paymentId})`,
