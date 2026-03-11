@@ -575,7 +575,10 @@ function Admin1Content() {
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
                             <Button variant="ghost" size="icon" onClick={() => setEditingPayment(p)} className="h-8 w-8 text-primary/40 hover:text-primary"><Edit className="h-3 w-3" /></Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeletePayment(p)} className="h-8 w-8 text-destructive"><Trash2 className="h-3 w-3" /></Button>
+                            {/* ONLY SHOW DELETE ICON FOR MANUAL PAYMENTS (NO RAZORPAY ID) */}
+                            {!p.razorpayPaymentId && (
+                              <Button variant="ghost" size="icon" onClick={() => handleDeletePayment(p)} className="h-8 w-8 text-destructive"><Trash2 className="h-3 w-3" /></Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
