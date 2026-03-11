@@ -18,7 +18,8 @@ import {
   CreditCard,
   ChevronRight,
   ShieldCheck,
-  Package
+  Package,
+  ArrowLeft
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +35,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
+  SheetClose
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/ui/logo";
@@ -165,7 +167,6 @@ export function Navbar() {
       updatedAt: new Date().toISOString()
     };
 
-    // Initiation of write without await as per guidelines
     setDocumentNonBlocking(orderRef, orderData, { merge: true });
 
     if (paymentId && finalAmountPaid > 0) {
@@ -176,7 +177,8 @@ export function Navbar() {
         amount: finalAmountPaid,
         paymentDate: new Date().toISOString(),
         remarks: `Excess Payment (Order: ${orderId.slice(0,8)}, Razorpay: ${paymentId})`,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        razorpayPaymentId: paymentId
       }, { merge: true });
     }
 
@@ -321,18 +323,18 @@ export function Navbar() {
                     )}
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-[100vw] sm:w-[480px] flex flex-col p-0 rounded-none shadow-2xl border-l border-primary/10 transition-all duration-500">
+                <SheetContent side="right" className="w-[100vw] sm:w-[480px] flex flex-col p-0 rounded-none shadow-2xl border-l border-primary/10">
                   <SheetHeader className="p-6 md:p-8 border-b border-primary/5 bg-primary/5">
                     <div className="flex justify-between items-center">
                       <div className="space-y-1">
                         <SheetTitle className="text-2xl md:text-3xl font-black uppercase tracking-tighter">Wholesale Cart</SheetTitle>
                         <SheetDescription className="text-[9px] font-black uppercase text-accent tracking-widest">Review Partner Procurement</SheetDescription>
                       </div>
-                      {cartCount > 0 && (
-                        <Button variant="ghost" size="sm" onClick={clearCart} className="text-[8px] font-black uppercase opacity-40 hover:opacity-100 hover:bg-red-50 hover:text-red-600 transition-all">
-                          <Trash2 className="h-3 w-3 mr-1" /> Clear All
+                      <SheetClose asChild>
+                        <Button variant="ghost" size="sm" className="text-[8px] font-black uppercase opacity-40 hover:opacity-100 flex items-center gap-1">
+                          <ArrowLeft className="h-3 w-3" /> Back
                         </Button>
-                      )}
+                      </SheetClose>
                     </div>
                   </SheetHeader>
 
@@ -403,11 +405,13 @@ export function Navbar() {
                             <ShoppingCart className="h-16 w-16" />
                           </div>
                           <p className="text-[10px] font-black uppercase tracking-[0.4em]">Registry Empty</p>
-                          <Link href="/catalog">
-                            <Button className="h-12 px-8 bg-primary text-background rounded-none uppercase font-black text-[9px] tracking-widest gap-2">
-                              Browse Catalog <ChevronRight className="h-3 w-3" />
-                            </Button>
-                          </Link>
+                          <SheetClose asChild>
+                            <Link href="/catalog">
+                              <Button className="h-12 px-8 bg-primary text-background rounded-none uppercase font-black text-[9px] tracking-widest gap-2">
+                                Browse Catalog <ChevronRight className="h-3 w-3" />
+                              </Button>
+                            </Link>
+                          </SheetClose>
                         </div>
                       )}
                     </div>
