@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { 
   User, 
   Download,
@@ -15,12 +17,16 @@ import {
   FileText,
   FileSpreadsheet,
   ArrowRight,
-  Loader2
+  Loader2,
+  CreditCard,
+  ShieldCheck,
+  CheckCircle2
 } from "lucide-react";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { collection, query, where, doc } from "firebase/firestore";
+import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { cn } from "@/lib/utils";
-import jsPDF from "jspdf";
+import jsPDF from "jsPDF";
 import autoTable from "jspdf-autotable";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +38,10 @@ export default function AccountPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
+  
+  // Payment State
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -107,6 +117,62 @@ export default function AccountPage() {
   const currentOutstanding = totalDebits - totalCredits;
 
   const utilizationPercent = Math.min(100, (Math.max(0, currentOutstanding) / (profile?.creditLimit || 1)) * 100);
+
+  const handlePayNow = () => {
+    const amount = parseFloat(paymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({ variant: "destructive", title: "Invalid Amount", description: "Please enter a valid amount to pay." });
+      return;
+    }
+
+    setIsProcessing(true);
+
+    const options = {
+      key: "rzp_live_SPD2FHOlvuoCjl",
+      amount: Math.round(amount * 100),
+      currency: "INR",
+      name: "Mochibazaar",
+      description: "Direct Ledger Payment",
+      handler: (response: any) => {
+        const paymentId = crypto.randomUUID();
+        const pRef = doc(db, "Payments", paymentId);
+        
+        const paymentData = {
+          id: paymentId,
+          userId: masterId,
+          amount: amount,
+          paymentDate: new Date().toISOString(),
+          remarks: `Direct Portal Payment (Ref: ${paymentId.slice(0, 8)})`,
+          createdAt: new Date().toISOString(),
+          razorpayPaymentId: response.razorpay_payment_id
+        };
+
+        setDocumentNonBlocking(pRef, paymentData, { merge: true });
+
+        toast({
+          title: "Payment Successful",
+          description: `₹${amount.toLocaleString()} has been added to your registry.`,
+        });
+        
+        setPaymentAmount("");
+        setIsProcessing(false);
+        setActiveTab("ledger");
+      },
+      prefill: {
+        name: profile?.firmName || "",
+        contact: profile?.phone || "",
+      },
+      theme: { color: "#000000" },
+      modal: {
+        ondismiss: () => {
+          setIsProcessing(false);
+        }
+      }
+    };
+
+    const rzp = new (window as any).Razorpay(options);
+    rzp.open();
+  };
 
   const handleDownloadInvoice = (order: any) => {
     if (!profile) return;
@@ -338,6 +404,7 @@ export default function AccountPage() {
             <TabsTrigger value="overview" className="flex-1 md:flex-none rounded-none px-6 md:px-8 h-full data-[state=active]:bg-accent uppercase font-black text-[9px] md:text-[10px]">Overview</TabsTrigger>
             <TabsTrigger value="ledger" className="flex-1 md:flex-none rounded-none px-6 md:px-8 h-full data-[state=active]:bg-accent uppercase font-black text-[9px] md:text-[10px]">Statement</TabsTrigger>
             <TabsTrigger value="orders" className="flex-1 md:flex-none rounded-none px-6 md:px-8 h-full data-[state=active]:bg-accent uppercase font-black text-[9px] md:text-[10px]">Orders</TabsTrigger>
+            <TabsTrigger value="payment" className="flex-1 md:flex-none rounded-none px-6 md:px-8 h-full data-[state=active]:bg-accent uppercase font-black text-[9px] md:text-[10px]">Pay Now</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
@@ -492,6 +559,79 @@ export default function AccountPage() {
                   </TableBody>
                 </Table>
               </div>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="payment">
+            <Card className="rounded-none border-none shadow-2xl bg-white max-w-2xl mx-auto overflow-hidden">
+              <CardHeader className="bg-primary text-background p-8 md:p-12 text-center space-y-4">
+                <div className="flex justify-center mb-2">
+                  <div className="bg-white/10 p-4 rounded-full">
+                    <CreditCard className="h-8 w-8 text-accent" />
+                  </div>
+                </div>
+                <CardTitle className="text-2xl md:text-4xl font-black uppercase tracking-tighter">Settle Ledger</CardTitle>
+                <CardDescription className="text-[10px] uppercase font-black tracking-[0.4em] text-white/60">Registry Direct Payment Gateway</CardDescription>
+              </CardHeader>
+              <CardContent className="p-8 md:p-12 space-y-8">
+                <div className="bg-secondary/5 border-l-4 border-accent p-6 flex justify-between items-center">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black uppercase opacity-40">Current Outstanding</p>
+                    <p className="text-2xl font-black">₹{formatCurrency(currentOutstanding)}</p>
+                  </div>
+                  <ShieldCheck className="h-8 w-8 text-accent opacity-20" />
+                </div>
+
+                <div className="space-y-6">
+                  <div className="space-y-3">
+                    <Label className="text-[10px] font-black uppercase tracking-widest">Payment Amount (INR)</Label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-xl text-primary/20">₹</span>
+                      <Input 
+                        type="number" 
+                        placeholder="Enter custom amount..."
+                        className="rounded-none border-primary/10 h-16 pl-10 text-xl font-black"
+                        value={paymentAmount}
+                        onChange={(e) => setPaymentAmount(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {[1000, 5000, 10000, currentOutstanding > 0 ? Math.round(currentOutstanding) : 0].filter(v => v > 0).map((val) => (
+                        <Button 
+                          key={val}
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setPaymentAmount(val.toString())}
+                          className="rounded-none h-8 text-[9px] font-black uppercase tracking-widest border-primary/10 hover:bg-primary hover:text-background"
+                        >
+                          ₹{val.toLocaleString()}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <Button 
+                    onClick={handlePayNow}
+                    disabled={isProcessing || !paymentAmount}
+                    className="w-full h-20 bg-primary text-background hover:bg-accent rounded-none uppercase font-black text-[11px] tracking-[0.4em] transition-all"
+                  >
+                    {isProcessing ? (
+                      <Loader2 className="animate-spin h-5 w-5" />
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <CheckCircle2 className="h-5 w-5" /> 
+                        Authorize Secure Payment
+                      </div>
+                    )}
+                  </Button>
+
+                  <div className="text-center">
+                    <p className="text-[8px] font-black uppercase tracking-widest opacity-30 flex items-center justify-center gap-2">
+                      <ShieldCheck className="h-3 w-3" /> PCI-DSS Compliant Encryption • Immediate Statement Sync
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
