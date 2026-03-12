@@ -155,29 +155,42 @@ export function Navbar() {
     if (!user || !sessionProfile) return;
     
     setIsProcessingPayment(true);
-    const orderId = crypto.randomUUID();
-    const orderRef = doc(db, "Orders", orderId);
     
+    // Capture immutable snapshots of cart state
     const masterIdSnapshot = sessionProfile?.originalRequestId || user.uid;
     const finalAmountPaid = amountPaid || 0;
     const itemsSnapshot = [...items];
     const totalSnapshot = cartTotal;
+    const orderId = crypto.randomUUID();
+    const timestamp = new Date().toISOString();
     
     try {
+      const orderRef = doc(db, "Orders", orderId);
+      
       const orderData = {
         id: orderId,
         userId: masterIdSnapshot,
-        items: itemsSnapshot.map(i => ({ ...i, discount: 0 })),
+        items: itemsSnapshot.map(i => ({
+          id: i.id,
+          name: i.name,
+          price: i.price,
+          quantity: i.quantity,
+          category: i.category || "",
+          mrp: i.mrp || 0,
+          margin: i.margin || 0,
+          discount: 0
+        })),
         totalAmount: totalSnapshot,
         status: "Processing",
         paymentId: paymentId || null,
         paidAmount: finalAmountPaid,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        createdAt: timestamp,
+        updatedAt: timestamp
       };
 
       await setDoc(orderRef, orderData, { merge: true });
 
+      // Record digital payment in ledger if applicable
       if (paymentId && finalAmountPaid > 0) {
         const pId = crypto.randomUUID();
         const pRef = doc(db, "Payments", pId);
@@ -185,9 +198,9 @@ export function Navbar() {
           id: pId,
           userId: masterIdSnapshot,
           amount: finalAmountPaid,
-          paymentDate: new Date().toISOString(),
+          paymentDate: timestamp,
           remarks: `Excess Payment (Order: ${orderId.slice(0,8)}, Razorpay: ${paymentId})`,
-          createdAt: new Date().toISOString(),
+          createdAt: timestamp,
           razorpayPaymentId: paymentId
         }, { merge: true });
       }
