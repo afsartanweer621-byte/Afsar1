@@ -82,6 +82,7 @@ export default function AccountPage() {
     return rawPayments
       .filter(p => !p.deleted)
       .filter(p => {
+        // Only include payments that are manual logs or have a verified Razorpay ID
         const isDigital = p.remarks?.toLowerCase().includes("direct portal") || p.remarks?.toLowerCase().includes("excess payment");
         if (isDigital) {
           return !!p.razorpayPaymentId;

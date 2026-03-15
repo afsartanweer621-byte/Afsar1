@@ -608,6 +608,7 @@ function AdminContent() {
                               variant="ghost" 
                               size="sm" 
                               onClick={() => {
+                                // Standardize to single imageUrl if needed, but we now use imageUrls[0]
                                 const normalized = { ...p, imageUrls: p.imageUrls || [p.imageUrl || "", "", ""] };
                                 setEditingProduct(normalized);
                               }} 
