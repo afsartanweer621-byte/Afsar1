@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -291,24 +292,48 @@ function AdminContent() {
     toast({ title: "Notification Removed" });
   };
 
-  const handleSaveProduct = () => {
-    if (!editingProduct) return;
+  const handleSaveProduct = async () => {
+    if (!editingProduct || !editingProduct.id) {
+      toast({ variant: "destructive", title: "Missing ID", description: "Product SKU ID is mandatory." });
+      return;
+    }
+
     const mrp = parseFloat(editingProduct.mrp) || 0;
     const margin = parseFloat(editingProduct.margin) || 0;
     const calculatedPrice = mrp * (1 - (margin / 100));
 
+    // CLEAN PAYLOAD: Do not duplicate identical image strings to avoid document size limit errors (1MB)
     const productRef = doc(db, "Products", editingProduct.id);
     const payload = {
-      ...editingProduct,
-      price: calculatedPrice,
+      id: editingProduct.id,
+      name: editingProduct.name || editingProduct.id,
+      category: editingProduct.category || "General",
+      stockQuantity: parseInt(editingProduct.stockQuantity) || 0,
       mrp: mrp,
       margin: margin,
+      price: calculatedPrice,
+      hsn: editingProduct.hsn || "6403",
+      imageUrl: editingProduct.imageUrl || "",
+      imageUrls: editingProduct.imageUrls || [editingProduct.imageUrl || ""],
+      deleted: false,
+      displayOrder: editingProduct.displayOrder || 999,
       updatedAt: new Date().toISOString()
     };
 
-    setDocumentNonBlocking(productRef, payload, { merge: true });
-    setEditingProduct(null);
-    toast({ title: "Inventory Updated" });
+    try {
+      await setDoc(productRef, payload, { merge: true });
+      setEditingProduct(null);
+      toast({ title: "Inventory Updated" });
+    } catch (e: any) {
+      console.error("Save error:", e);
+      toast({ 
+        variant: "destructive", 
+        title: "Save Failed", 
+        description: e.message?.includes("permissions") 
+          ? "Permission Denied. Check photo size or login status." 
+          : "Could not sync article." 
+      });
+    }
   };
 
   const handleAddNewProduct = () => {
@@ -331,6 +356,16 @@ function AdminContent() {
   const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Optional: Size check to prevent Firestore 1MB limit issues
+    if (file.size > 800000) {
+      toast({ 
+        variant: "destructive", 
+        title: "Photo Too Large", 
+        description: "Please use an optimized image under 800KB." 
+      });
+      return;
+    }
 
     setIsUploading(true);
     try {
@@ -608,8 +643,8 @@ function AdminContent() {
                               variant="ghost" 
                               size="sm" 
                               onClick={() => {
-                                // Standardize to single imageUrl if needed, but we now use imageUrls[0]
-                                const normalized = { ...p, imageUrls: p.imageUrls || [p.imageUrl || "", "", ""] };
+                                // Standardize to single imageUrl logic
+                                const normalized = { ...p, imageUrls: p.imageUrls || [p.imageUrl || ""] };
                                 setEditingProduct(normalized);
                               }} 
                               className="p-1"
@@ -695,7 +730,7 @@ function AdminContent() {
         </Tabs>
       </main>
 
-      {/* Product Edit Dialog */}
+      {/* Product Edit Dialog (Single Photo Flow) */}
       <Dialog open={!!editingProduct} onOpenChange={() => setEditingProduct(null)}>
         <DialogContent className="max-w-[95vw] md:max-w-xl max-h-[90vh] overflow-y-auto rounded-none p-0 bg-background">
           <DialogHeader className="p-6 border-b border-primary/5">
@@ -703,7 +738,7 @@ function AdminContent() {
           </DialogHeader>
           <div className="p-6 space-y-6">
             <div className="space-y-3">
-              <Label className="text-[9px] font-black uppercase opacity-40">Product Media (896 x 1195)</Label>
+              <Label className="text-[9px] font-black uppercase opacity-40">Product Media (896 x 1195 Ratio)</Label>
               <div className="flex justify-center">
                 <div 
                   onClick={() => fileInputRef.current?.click()}
@@ -725,8 +760,8 @@ function AdminContent() {
                     <div className="flex flex-col items-center gap-3 opacity-20">
                       <Upload className="h-8 w-8" />
                       <div className="flex flex-col items-center gap-1">
-                        <span className="text-[10px] font-black uppercase">Upload Article Photo</span>
-                        <span className="text-[8px] font-bold">Portrait Ratio Only</span>
+                        <span className="text-[10px] font-black uppercase">Upload Photo</span>
+                        <span className="text-[8px] font-bold">896 x 1195 Ratio</span>
                       </div>
                     </div>
                   )}
@@ -751,15 +786,32 @@ function AdminContent() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Input placeholder="ID" value={editingProduct?.id ?? ""} onChange={(e) => setEditingProduct({...editingProduct, id: e.target.value})} className="rounded-none" />
-              <Input placeholder="NAME" value={editingProduct?.name ?? ""} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="rounded-none" />
+              <div className="space-y-1">
+                <Label className="text-[9px] font-black uppercase">Article SKU ID</Label>
+                <Input placeholder="E.G. 1021" value={editingProduct?.id ?? ""} onChange={(e) => setEditingProduct({...editingProduct, id: e.target.value})} className="rounded-none font-bold" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[9px] font-black uppercase">Article Name</Label>
+                <Input placeholder="E.G. PRADOHILL OXFORD" value={editingProduct?.name ?? ""} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="rounded-none font-bold" />
+              </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
-              <Input type="number" placeholder="MRP" value={editingProduct?.mrp ?? 0} onChange={(e) => setEditingProduct({...editingProduct, mrp: e.target.value})} className="rounded-none" />
-              <Input type="number" placeholder="MARGIN %" value={editingProduct?.margin ?? 0} onChange={(e) => setEditingProduct({...editingProduct, margin: e.target.value})} className="rounded-none" />
-              <Input type="number" placeholder="STOCK" value={editingProduct?.stockQuantity ?? 0} onChange={(e) => setEditingProduct({...editingProduct, stockQuantity: e.target.value})} className="rounded-none" />
+              <div className="space-y-1">
+                <Label className="text-[9px] font-black uppercase">MRP</Label>
+                <Input type="number" placeholder="MRP" value={editingProduct?.mrp ?? 0} onChange={(e) => setEditingProduct({...editingProduct, mrp: e.target.value})} className="rounded-none font-bold" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[9px] font-black uppercase">Margin %</Label>
+                <Input type="number" placeholder="38" value={editingProduct?.margin ?? 0} onChange={(e) => setEditingProduct({...editingProduct, margin: e.target.value})} className="rounded-none font-bold" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[9px] font-black uppercase">Stock</Label>
+                <Input type="number" placeholder="QTY" value={editingProduct?.stockQuantity ?? 0} onChange={(e) => setEditingProduct({...editingProduct, stockQuantity: e.target.value})} className="rounded-none font-bold" />
+              </div>
             </div>
-            <Button onClick={handleSaveProduct} className="w-full h-14 bg-primary text-background rounded-none uppercase font-black text-[10px]">Save Article</Button>
+            <Button onClick={handleSaveProduct} className="w-full h-14 bg-primary text-background rounded-none uppercase font-black text-[10px] tracking-widest">
+              Save to Registry
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

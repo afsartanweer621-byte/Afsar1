@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -390,7 +391,7 @@ export default function AccountPage() {
   if (!mounted || isSessionLoading || isProfileLoading) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-6">
-        <Clock className="h-12 w-12 animate-pulse text-accent" />
+        <Loader2 className="h-12 w-12 animate-pulse text-accent" />
         <p className="text-[10px] font-black uppercase tracking-widest text-primary/40">Synchronizing Master Profile...</p>
       </div>
     );
