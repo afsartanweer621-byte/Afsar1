@@ -203,7 +203,7 @@ export default function CatalogPage() {
                 <div key={product.id} className="group flex flex-col bg-white border border-primary/5 hover:border-accent/10 transition-all overflow-hidden shadow-sm relative">
                   <Link href={`/catalog/${product.id}`} className="absolute inset-0 z-0" />
                   
-                  <div className="relative h-20 md:h-24 w-full bg-primary/5">
+                  <div className="relative aspect-[896/1195] w-full bg-primary/5">
                     {displayImg ? (
                       <Image 
                         src={displayImg} 

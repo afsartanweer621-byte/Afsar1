@@ -150,7 +150,7 @@ export default function ArticleDetailPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16">
           <div className="space-y-4">
-            <div className="relative aspect-square bg-primary/5 border border-primary/5 overflow-hidden group">
+            <div className="relative aspect-[896/1195] bg-primary/5 border border-primary/5 overflow-hidden group">
               {images.length > 0 ? (
                 <Image 
                   src={images[activeImageIdx]} 
@@ -245,12 +245,12 @@ export default function ArticleDetailPage() {
               <div className="flex flex-col sm:flex-row gap-3 items-end">
                 <div className="space-y-2 w-full sm:w-24">
                   <label className="text-[8px] font-black uppercase tracking-widest opacity-40">QUANTITY</label>
-                  <Input 
+                  <input 
                     type="number" 
                     placeholder="0"
                     step="4"
                     min="0"
-                    className="rounded-none border-primary/10 h-12 font-black text-center text-lg w-full p-0"
+                    className="flex h-12 w-full rounded-none border border-primary/10 bg-background px-3 py-2 text-lg ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-black text-center p-0"
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
                   />
