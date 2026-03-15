@@ -70,7 +70,7 @@ function AdminContent() {
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
-  const fileInputRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const bulkUploadRef = useRef<HTMLInputElement>(null);
   
   const [activeTab, setActiveTab] = useState("orders");
@@ -321,13 +321,14 @@ function AdminContent() {
       margin: 38,
       price: 0,
       hsn: "6403",
-      imageUrls: ["", "", ""],
+      imageUrl: "",
+      imageUrls: [""],
       deleted: false,
       displayOrder: mergedProducts.length + 1
     });
   };
 
-  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -338,9 +339,11 @@ function AdminContent() {
         const result = event.target?.result as string;
         setEditingProduct((prev: any) => {
           if (!prev) return prev;
-          const newUrls = [...(prev.imageUrls || ["", "", ""])];
-          newUrls[index] = result;
-          return { ...prev, imageUrls: newUrls };
+          return { 
+            ...prev, 
+            imageUrl: result,
+            imageUrls: [result] 
+          };
         });
         toast({ title: "Image Prepared" });
       };
@@ -349,16 +352,18 @@ function AdminContent() {
       toast({ variant: "destructive", title: "Upload Failed" });
     } finally {
       setIsUploading(false);
-      e.target.value = ""; // Reset so same file can be selected again
+      e.target.value = "";
     }
   };
 
-  const removeImage = (index: number) => {
+  const removeImage = () => {
     setEditingProduct((prev: any) => {
       if (!prev) return prev;
-      const newUrls = [...(prev.imageUrls || ["", "", ""])];
-      newUrls[index] = "";
-      return { ...prev, imageUrls: newUrls };
+      return { 
+        ...prev, 
+        imageUrl: "",
+        imageUrls: [""] 
+      };
     });
   };
 
@@ -697,44 +702,51 @@ function AdminContent() {
           </DialogHeader>
           <div className="p-6 space-y-6">
             <div className="space-y-3">
-              <Label className="text-[9px] font-black uppercase opacity-40">Product Media</Label>
-              <div className="grid grid-cols-3 gap-4">
-                {[0, 1, 2].map((idx) => (
-                  <div 
-                    key={idx} 
-                    onClick={() => fileInputRefs[idx].current?.click()}
-                    className="relative group aspect-square bg-primary/5 border border-dashed border-primary/20 flex items-center justify-center cursor-pointer overflow-hidden"
-                  >
-                    {editingProduct?.imageUrls?.[idx] ? (
-                      <div className="relative w-full h-full">
-                        <Image src={editingProduct.imageUrls[idx]} alt="" fill className="object-cover" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <Edit className="text-white h-5 w-5" />
-                        </div>
+              <Label className="text-[9px] font-black uppercase opacity-40">Product Media (896 x 1195)</Label>
+              <div className="flex justify-center">
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="relative group w-full max-w-[280px] aspect-[896/1195] bg-primary/5 border border-dashed border-primary/20 flex items-center justify-center cursor-pointer overflow-hidden transition-colors hover:bg-primary/10"
+                >
+                  {editingProduct?.imageUrls?.[0] || editingProduct?.imageUrl ? (
+                    <div className="relative w-full h-full">
+                      <Image 
+                        src={editingProduct.imageUrls?.[0] || editingProduct.imageUrl} 
+                        alt="" 
+                        fill 
+                        className="object-cover" 
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Edit className="text-white h-8 w-8" />
                       </div>
-                    ) : (
-                      <div className="flex flex-col items-center gap-1 opacity-20">
-                        <Upload className="h-5 w-5" />
-                        <span className="text-[7px] font-black uppercase">Slot {idx + 1}</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-3 opacity-20">
+                      <Upload className="h-8 w-8" />
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="text-[10px] font-black uppercase">Upload Article Photo</span>
+                        <span className="text-[8px] font-bold">Portrait Ratio Only</span>
                       </div>
-                    )}
-                    {editingProduct?.imageUrls?.[idx] && (
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); removeImage(idx); }} 
-                        className="absolute z-20 -top-2 -right-2 bg-destructive text-white p-1 rounded-full shadow-lg hover:scale-110 transition-transform"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
-                    <input 
-                      type="file" 
-                      ref={fileInputRefs[idx]} 
-                      className="hidden" 
-                      accept="image/*" 
-                      onChange={(e) => handleImageFileChange(e, idx)} 
-                    />
-                  </div>
-                ))}
+                    </div>
+                  )}
+                  
+                  {(editingProduct?.imageUrls?.[0] || editingProduct?.imageUrl) && (
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); removeImage(); }} 
+                      className="absolute z-20 top-4 right-4 bg-destructive text-white p-2 rounded-full shadow-xl hover:scale-110 transition-transform"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                  
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/*" 
+                    onChange={handleImageFileChange} 
+                  />
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -863,7 +875,7 @@ function AdminContent() {
               Are you absolutely sure? This action will permanently remove this article from the Registry. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="mt-6">
+          <AlertDialogFooter className="text-right">
             <AlertDialogCancel className="rounded-none uppercase font-black text-[10px] tracking-widest h-12">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => {
               if (productToDelete) {
