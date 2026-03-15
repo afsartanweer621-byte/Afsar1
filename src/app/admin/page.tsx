@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -336,9 +335,13 @@ function AdminContent() {
     try {
       const reader = new FileReader();
       reader.onload = (event) => {
-        const newUrls = [...(editingProduct.imageUrls || ["", "", ""])];
-        newUrls[index] = event.target?.result as string;
-        setEditingProduct({ ...editingProduct, imageUrls: newUrls });
+        const result = event.target?.result as string;
+        setEditingProduct((prev: any) => {
+          if (!prev) return prev;
+          const newUrls = [...(prev.imageUrls || ["", "", ""])];
+          newUrls[index] = result;
+          return { ...prev, imageUrls: newUrls };
+        });
         toast({ title: "Image Prepared" });
       };
       reader.readAsDataURL(file);
@@ -346,13 +349,17 @@ function AdminContent() {
       toast({ variant: "destructive", title: "Upload Failed" });
     } finally {
       setIsUploading(false);
+      e.target.value = ""; // Reset so same file can be selected again
     }
   };
 
   const removeImage = (index: number) => {
-    const newUrls = [...(editingProduct.imageUrls || ["", "", ""])];
-    newUrls[index] = "";
-    setEditingProduct({ ...editingProduct, imageUrls: newUrls });
+    setEditingProduct((prev: any) => {
+      if (!prev) return prev;
+      const newUrls = [...(prev.imageUrls || ["", "", ""])];
+      newUrls[index] = "";
+      return { ...prev, imageUrls: newUrls };
+    });
   };
 
   const handleBulkUploadCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -592,7 +599,17 @@ function AdminContent() {
                         <TableCell className="font-black text-[10px]">₹{p.price?.toFixed(2)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => setEditingProduct(p)} className="p-1"><Edit className="h-3 w-3" /></Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => {
+                                const normalized = { ...p, imageUrls: p.imageUrls || [p.imageUrl || "", "", ""] };
+                                setEditingProduct(normalized);
+                              }} 
+                              className="p-1"
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
                             <Button variant="ghost" size="icon" onClick={() => setProductToDelete(p.id)} className="h-8 w-8 text-destructive"><Trash2 className="h-3 w-3" /></Button>
                           </div>
                         </TableCell>
@@ -683,19 +700,39 @@ function AdminContent() {
               <Label className="text-[9px] font-black uppercase opacity-40">Product Media</Label>
               <div className="grid grid-cols-3 gap-4">
                 {[0, 1, 2].map((idx) => (
-                  <div key={idx} className="relative group aspect-square bg-primary/5 border border-dashed border-primary/20 flex items-center justify-center cursor-pointer">
+                  <div 
+                    key={idx} 
+                    onClick={() => fileInputRefs[idx].current?.click()}
+                    className="relative group aspect-square bg-primary/5 border border-dashed border-primary/20 flex items-center justify-center cursor-pointer overflow-hidden"
+                  >
                     {editingProduct?.imageUrls?.[idx] ? (
-                      <Image src={editingProduct.imageUrls[idx]} alt="" fill className="object-cover" />
+                      <div className="relative w-full h-full">
+                        <Image src={editingProduct.imageUrls[idx]} alt="" fill className="object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <Edit className="text-white h-5 w-5" />
+                        </div>
+                      </div>
                     ) : (
-                      <div className="flex flex-col items-center gap-1 opacity-20" onClick={() => fileInputRefs[idx].current?.click()}>
+                      <div className="flex flex-col items-center gap-1 opacity-20">
                         <Upload className="h-5 w-5" />
                         <span className="text-[7px] font-black uppercase">Slot {idx + 1}</span>
                       </div>
                     )}
                     {editingProduct?.imageUrls?.[idx] && (
-                      <button onClick={() => removeImage(idx)} className="absolute -top-2 -right-2 bg-destructive text-white p-1 rounded-full"><X className="h-3 w-3" /></button>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); removeImage(idx); }} 
+                        className="absolute z-20 -top-2 -right-2 bg-destructive text-white p-1 rounded-full shadow-lg hover:scale-110 transition-transform"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
                     )}
-                    <input type="file" ref={fileInputRefs[idx]} className="hidden" accept="image/*" onChange={(e) => handleImageFileChange(e, idx)} />
+                    <input 
+                      type="file" 
+                      ref={fileInputRefs[idx]} 
+                      className="hidden" 
+                      accept="image/*" 
+                      onChange={(e) => handleImageFileChange(e, idx)} 
+                    />
                   </div>
                 ))}
               </div>
