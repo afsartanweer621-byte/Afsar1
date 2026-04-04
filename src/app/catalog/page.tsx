@@ -65,7 +65,10 @@ export default function CatalogPage() {
     
     const base = [...FALLBACK_PRODUCTS];
     if (!firestoreProducts || firestoreProducts.length === 0) {
-      return base.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+      // Apply stock filter to fallback products
+      return base
+        .filter(p => (p.stockQuantity || 0) >= 4)
+        .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
     }
 
     const firestoreMap = new Map(firestoreProducts.map(p => [p.id, p]));
@@ -91,7 +94,7 @@ export default function CatalogPage() {
     });
     
     return merged
-      .filter(p => !p.deleted)
+      .filter(p => !p.deleted && (p.stockQuantity || 0) >= 4) // HIDE ARTICLES WITH STOCK < 4
       .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
   }, [firestoreProducts, loadingProducts]);
 
@@ -175,7 +178,7 @@ export default function CatalogPage() {
             Product <span className="text-accent">Catalog</span>.
           </h1>
           <p className="text-[8px] font-black uppercase tracking-widest text-accent opacity-80">
-            * All items must be ordered in multiples of 4 pieces. Click article to view full details.
+            * All items must be ordered in multiples of 4 pieces. Only articles with stock 4+ are displayed.
           </p>
         </header>
 
@@ -191,7 +194,7 @@ export default function CatalogPage() {
               />
             </div>
             <div className="text-[7px] font-black uppercase text-primary/30">
-              {filteredProducts.length} ARTICLES
+              {filteredProducts.length} ARTICLES AVAILABLE
             </div>
           </div>
 
